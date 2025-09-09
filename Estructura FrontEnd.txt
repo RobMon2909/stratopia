@@ -1,0 +1,19 @@
+client/
+├── public/
+├── src/
+│   ├── components/
+│   │   ├── Navbar.tsx
+│   │   ├── WorkspaceSidebar.tsx
+│   │   ├── TaskList.tsx
+│   │   └── TaskCard.tsx
+│   ├── pages/
+│   │   ├── LoginPage.tsx
+│   │   ├── RegisterPage.tsx
+│   │   └── DashboardPage.tsx
+│   ├── services/
+│   │   └── api.ts
+│   ├── App.tsx
+│   ├── main.tsx
+│   └── index.css
+├── package.json
+└── tailwind.config.js

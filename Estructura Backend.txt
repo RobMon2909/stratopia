@@ -1,0 +1,19 @@
+server/
+├── prisma/
+│   ├── schema.prisma
+│   └── migrations/
+├── src/
+│   ├── controllers/
+│   │   ├── authController.ts
+│   │   ├── taskController.ts
+│   │   └── workspaceController.ts
+│   ├── middleware/
+│   │   └── authMiddleware.ts
+│   ├── routes/
+│   │   ├── auth.ts
+│   │   ├── tasks.ts
+│   │   └── workspaces.ts
+│   └── index.ts
+├── .env
+├── package.json
+└── tsconfig.json
