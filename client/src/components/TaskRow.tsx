@@ -1,7 +1,17 @@
 import React from 'react';
-import type { Task, CustomField, FieldOption, NestedTask } from '../types';
+import type { Task, CustomField, FieldOption, NestedTask, User, Workspace } from '../types';
 import EditableCell from './EditableCell.tsx';
+import EditableSelect from './EditableSelect.tsx'; // <-- IMPORTAMOS EL NUEVO COMPONENTE
 import Avatar from './ui/Avatar.tsx';
+import Tag from './ui/Tag.tsx';
+
+// Un mapa para los colores e íconos de las prioridades
+const priorityStyles: { [key: string]: { color: string; icon: React.ReactElement } } = {
+    'Urgente': { color: '#EF4444', icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4"><path d="M3 3.75a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 .75.75v5.5a.75.75 0 0 1-1.5 0V4.5h-3v8.75a.75.75 0 0 1-1.5 0V4.5h-3v5.5a.75.75 0 0 1-1.5 0v-5.5Z" /></svg> },
+    'Alta':    { color: '#F97316', icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4"><path d="M3 3.75a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 .75.75v5.5a.75.75 0 0 1-1.5 0V4.5h-3v8.75a.75.75 0 0 1-1.5 0V4.5h-3v5.5a.75.75 0 0 1-1.5 0v-5.5Z" /></svg> },
+    'Normal':  { color: '#2563EB', icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4"><path d="M3 3.75a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 .75.75v5.5a.75.75 0 0 1-1.5 0V4.5h-3v8.75a.75.75 0 0 1-1.5 0V4.5h-3v5.5a.75.75 0 0 1-1.5 0v-5.5Z" /></svg> },
+    'Baja':    { color: '#8B5CF6', icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4"><path d="M3 3.75a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 .75.75v5.5a.75.75 0 0 1-1.5 0V4.5h-3v8.75a.75.75 0 0 1-1.5 0V4.5h-3v5.5a.75.75 0 0 1-1.5 0v-5.5Z" /></svg> },
+};
 
 interface TaskRowProps {
     task: NestedTask;
@@ -24,22 +34,25 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, customFields, fieldOptions, onO
     const renderCustomField = (field: CustomField) => {
         const valueData = task.customFields?.[field.id];
         if (!valueData) return <span className="text-gray-400">-</span>;
+
         switch(field.type) {
             case 'text':
                 return <div className="max-w-[150px] truncate" title={valueData.value}>{valueData.value || <span className="text-gray-400">-</span>}</div>;
             case 'dropdown':
                 const dropdownOption = (fieldOptions[field.id] || []).find(opt => opt.id === valueData.optionId);
                 if (!dropdownOption) return <span className="text-gray-400">-</span>;
-                return <span style={{ backgroundColor: dropdownOption.color + '40', color: dropdownOption.color.replace('85%)', '45%)') }} className="px-2 py-1 text-xs font-bold rounded-full">{dropdownOption.value}</span>;
+                return <Tag text={dropdownOption.value} color={dropdownOption.color} />;
             case 'labels':
                 const selectedIds = valueData.optionIds || [];
                 const options = fieldOptions[field.id] || [];
                 if (selectedIds.length === 0) return <span className="text-gray-400">-</span>;
-                return (<div className="flex flex-wrap gap-1">{selectedIds.map(id => { const option = options.find(opt => opt.id === id); if (!option) return null; return (<span key={id} style={{ backgroundColor: option.color + '40', color: option.color.replace('85%)', '45%)') }} className="px-2 py-1 text-xs font-bold rounded-full">{option.value}</span>);})}</div>);
+                return (<div className="flex flex-wrap gap-1">{selectedIds.map(id => { const option = options.find(opt => opt.id === id); if (!option) return null; return (<Tag key={id} text={option.value} color={option.color} />);})}</div>);
             default:
                 return <span className="text-gray-400">-</span>;
         }
     };
+
+    const priorityStyle = task.priority ? (priorityStyles[task.priority] || { color: '#6B7280', icon: priorityStyles['Normal'].icon }) : null;
 
     return (
         <>
@@ -50,8 +63,16 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, customFields, fieldOptions, onO
                     </div>
                 </td>
                 <td className="px-6 py-2">{formatDate(task.dueDate)}</td>
-                <td className="px-6 py-2"><div className="flex -space-x-2">{task.assignees && task.assignees.map(assignee => (<Avatar key={assignee.id} name={assignee.name} />))}</div></td>
-                <td className="px-6 py-2">{task.priority || <span className="text-gray-400">-</span>}</td>
+                <td className="px-6 py-2">
+                    <div className="flex -space-x-2">
+                        {task.assignees && task.assignees.map(assignee => (<Avatar key={assignee.id} name={assignee.name} />))}
+                        {(!task.assignees || task.assignees.length === 0) && <Avatar />}
+                    </div>
+                </td>
+                <td className="px-6 py-2">
+                    {/* --- CAMBIO CLAVE: Usamos el componente Tag para Prioridad --- */}
+                    {priorityStyle && <Tag text={task.priority} color={priorityStyle.color} icon={priorityStyle.icon} />}
+                </td>
                 {customFields.map(field => (<td key={field.id} className="px-6 py-2">{renderCustomField(field)}</td>))}
                 <td className="px-4 py-2 opacity-0 group-hover:opacity-100 transition-opacity text-center">
                     <button onClick={() => onOpenTask(task, task.listId)} className="font-medium text-blue-600 hover:underline text-xs" title="Abrir detalles">Abrir</button>
