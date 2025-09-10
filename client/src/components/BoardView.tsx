@@ -1,5 +1,7 @@
+// src/components/BoardView.tsx
+
 import React, { useState, useEffect } from 'react';
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { DragDropContext, Droppable, Draggable, OnDragEndResponder } from '@hello-pangea/dnd';
 import type { Task, CustomField, FieldOption } from '../types';
 import TaskCard from './TaskCard.tsx';
 import { updateTask } from '../services/api.ts';
@@ -14,7 +16,8 @@ interface BoardViewProps {
 }
 
 const BoardView: React.FC<BoardViewProps> = ({ tasks, statusField, statusOptions, customFields, onOpenTask, onDataNeedsRefresh }) => {
-    const [columns, setColumns] = useState<any>({});
+    type ColumnMap = { [key: string]: { name: string; color: string; items: Task[] } };
+    const [columns, setColumns] = useState<ColumnMap>({});
 
     useEffect(() => {
         if (!statusField || !statusOptions) {
@@ -22,83 +25,128 @@ const BoardView: React.FC<BoardViewProps> = ({ tasks, statusField, statusOptions
             return;
         }
 
-        const newColumns: { [key: string]: { name: string; color: string; items: Task[] } } = {};
+        const newColumns: ColumnMap = {};
         const sortedOptions = [...statusOptions].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
 
         sortedOptions.forEach(option => {
-            newColumns[option.id] = { name: option.value, color: option.color, items: [] };
+            newColumns[option.id] = { name: option.value, color: option.color || '#cccccc', items: [] };
         });
+        
+        const unassignedColumnId = 'unassigned';
+        newColumns[unassignedColumnId] = { name: "Sin Estado", color: '#9CA3AF', items: [] };
 
         tasks.forEach(task => {
             const statusValue = task.customFields?.[statusField.id];
-            let statusOptionId: string | null | undefined = null;
+            let statusOptionId: string | null = null;
 
             if (statusValue) {
                 if (statusField.type === 'labels' && statusValue.optionIds && statusValue.optionIds.length > 0) {
                     statusOptionId = statusValue.optionIds[0];
-                } else if (statusField.type === 'dropdown') {
+                } else if (statusField.type === 'dropdown' && statusValue.optionId) {
                     statusOptionId = statusValue.optionId;
                 }
             }
 
             if (statusOptionId && newColumns[statusOptionId]) {
                 newColumns[statusOptionId].items.push(task);
+            } else {
+                 newColumns[unassignedColumnId].items.push(task);
             }
         });
+        
+        if (newColumns[unassignedColumnId].items.length === 0) {
+            delete newColumns[unassignedColumnId];
+        }
+
         setColumns(newColumns);
     }, [tasks, statusField, statusOptions]);
 
-    const onDragEnd = (result: any) => {
+    const onDragEnd: OnDragEndResponder = (result) => {
         if (!result.destination || !statusField) return;
         const { source, destination, draggableId } = result;
 
-        if (source.droppableId !== destination.droppableId) {
-            const sourceColumn = columns[source.droppableId];
-            const destColumn = columns[destination.droppableId];
-            const sourceItems = [...sourceColumn.items];
-            const [movedTask] = sourceItems.splice(source.index, 1);
-            const destItems = [...destColumn.items];
-            destItems.splice(destination.index, 0, movedTask);
-            
-            setColumns({
-                ...columns,
-                [source.droppableId]: { ...sourceColumn, items: sourceItems },
-                [destination.droppableId]: { ...destColumn, items: destItems },
-            });
-            
-            const newOptionId = destination.droppableId;
-            const newOptionValue = destColumn.name;
-            const taskToUpdate = tasks.find(t => t.id === draggableId);
-            const currentCustomFields = taskToUpdate?.customFields || {};
-            
-            const otherFieldsPayload = Object.entries(currentCustomFields)
-                .filter(([fieldId]) => fieldId !== statusField.id)
-                .map(([fieldId, data]) => ({
-                    fieldId, value: data.value, optionId: data.optionId,
-                    optionIds: data.optionIds, type: customFields.find(f => f.id === fieldId)?.type, valueId: data.valueId
-                }));
-
-            const statusFieldPayload = {
-                fieldId: statusField.id,
-                value: newOptionValue,
-                optionId: newOptionId,
-                type: statusField.type
-            };
-
-            const finalPayload = {
-                taskId: draggableId,
-                customFields: [statusFieldPayload, ...otherFieldsPayload]
-            };
-            
-            updateTask(finalPayload)
-                .catch(err => {
-                    console.error("Failed to update task status", err);
-                    alert("No se pudo mover la tarea.");
-                })
-                .finally(() => {
-                    onDataNeedsRefresh();
-                });
+        if (source.droppableId === destination.droppableId && source.index === destination.index) {
+            return;
         }
+
+        const startColumn = columns[source.droppableId];
+        const endColumn = columns[destination.droppableId];
+        
+        const originalColumns = JSON.parse(JSON.stringify(columns));
+
+        const startItems = [...startColumn.items];
+        const [movedTask] = startItems.splice(source.index, 1);
+        
+        if (startColumn === endColumn) {
+            startItems.splice(destination.index, 0, movedTask);
+            const newColumn = { ...startColumn, items: startItems };
+            setColumns(prev => ({ ...prev, [source.droppableId]: newColumn }));
+        } else {
+            const endItems = [...endColumn.items];
+            endItems.splice(destination.index, 0, movedTask);
+            setColumns(prev => ({
+                ...prev,
+                [source.droppableId]: { ...startColumn, items: startItems },
+                [destination.droppableId]: { ...endColumn, items: endItems },
+            }));
+        }
+
+        const taskToUpdate = tasks.find(t => t.id === draggableId);
+        if (!taskToUpdate) return;
+        
+        // --- INICIO DE LA CORRECCIÓN DE TIPOS ---
+
+        // 1. Definimos un tipo para el payload de un campo personalizado para mayor claridad.
+        type CustomFieldPayload = {
+            fieldId: string;
+            valueId?: string;
+            value?: any;
+            optionId?: string;
+            optionIds?: string[];
+        };
+
+        // 2. Mapeamos los campos personalizados existentes, EXCLUYENDO el de estado.
+        const existingFieldsPayload: CustomFieldPayload[] = Object.entries(taskToUpdate.customFields || {})
+            .filter(([fieldId]) => fieldId !== statusField.id)
+            .map(([fieldId, data]) => ({
+                fieldId: fieldId,
+                valueId: data.valueId,
+                value: data.value,
+                optionId: data.optionId || undefined,
+                optionIds: data.optionIds || undefined,
+            }));
+        
+        // 3. Creamos el nuevo payload para el campo de estado de forma segura.
+        const newStatusOptionId = destination.droppableId;
+        const newStatusPayload: CustomFieldPayload = {
+            fieldId: statusField.id
+        };
+
+        if (statusField.type === 'labels') {
+            newStatusPayload.optionIds = [newStatusOptionId];
+        } else { // 'dropdown' u otros
+            newStatusPayload.optionId = newStatusOptionId;
+        }
+
+        // 4. Combinamos los campos existentes con el campo de estado actualizado.
+        const finalCustomFieldsPayload = [...existingFieldsPayload, newStatusPayload];
+        
+ // --- AÑADE ESTA LÍNEA AQUÍ ---
+        console.log("Enviando a la API updateTask:", { taskId: draggableId, customFields: finalCustomFieldsPayload });
+        // --- FIN DE LA LÍNEA A AÑADIR ---
+
+        // --- FIN DE LA CORRECCIÓN DE TIPOS ---
+
+        updateTask({ taskId: draggableId, customFields: finalCustomFieldsPayload })
+            .then(() => {
+                console.log("Tarea actualizada con éxito!");
+                onDataNeedsRefresh();
+            })
+            .catch(err => {
+                console.error("Fallo al actualizar el estado de la tarea:", err);
+                alert("No se pudo mover la tarea. El cambio se revertirá.");
+                setColumns(originalColumns);
+            });
     };
 
     if (!statusField) {
@@ -108,16 +156,16 @@ const BoardView: React.FC<BoardViewProps> = ({ tasks, statusField, statusOptions
     return (
         <div className="flex gap-4 overflow-x-auto p-2 h-full">
             <DragDropContext onDragEnd={onDragEnd}>
-                {Object.entries(columns).map(([columnId, column]: [string, any]) => (
+                {Object.entries(columns).map(([columnId, column]) => (
                     <div key={columnId} className="w-72 bg-gray-100 rounded-lg flex flex-col flex-shrink-0 h-full">
                         <div className="p-3 font-semibold text-sm border-b-2" style={{ borderBottomColor: column.color }}>
                             <span className="px-2 py-1 rounded text-xs font-bold" style={{ backgroundColor: column.color + '30', color: column.color }}>{column.name}</span>
                             <span className="ml-2 text-gray-500">{column.items.length}</span>
                         </div>
                         <Droppable droppableId={columnId}>
-                            {(provided) => (
-                                <div {...provided.droppableProps} ref={provided.innerRef} className="p-3 flex-grow min-h-[100px]">
-                                    {column.items.map((item: Task, index: number) => (
+                            {(provided, snapshot) => (
+                                <div {...provided.droppableProps} ref={provided.innerRef} className={`p-3 flex-grow min-h-[100px] rounded-b-lg transition-colors duration-300 ${snapshot.isDraggingOver ? 'bg-blue-100' : ''}`}>
+                                    {column.items.map((item, index) => (
                                         <Draggable key={item.id} draggableId={item.id} index={index}>
                                             {(provided) => (
                                                 <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} className="mb-2">
