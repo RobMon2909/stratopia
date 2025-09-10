@@ -93,14 +93,48 @@ try {
     
     // Actualizar asignados
     if (isset($data->assigneeIds) && is_array($data->assigneeIds)) {
-        $stmt_del_assignees = $conn->prepare("DELETE FROM task_assignees WHERE taskId = ?");
-        $stmt_del_assignees->bind_param("s", $taskId); $stmt_del_assignees->execute(); $stmt_del_assignees->close();
-        if(!empty($data->assigneeIds)) {
-            $stmt_add_assignees = $conn->prepare("INSERT INTO task_assignees (taskId, userId) VALUES (?, ?)");
-            foreach ($data->assigneeIds as $userId) { $stmt_add_assignees->bind_param("ss", $taskId, $userId); $stmt_add_assignees->execute(); }
-            $stmt_add_assignees->close();
-        }
+    // Primero, obtenemos la lista de usuarios ya asignados a esta tarea
+    $stmt_get_assignees = $conn->prepare("SELECT userId FROM task_assignees WHERE taskId = ?");
+    $stmt_get_assignees->bind_param("s", $taskId);
+    $stmt_get_assignees->execute();
+    $current_assignees_result = $stmt_get_assignees->get_result();
+    $current_assignee_ids = [];
+    while ($row = $current_assignees_result->fetch_assoc()) {
+        $current_assignee_ids[] = $row['userId'];
     }
+    $stmt_get_assignees->close();
+
+    // Borramos las asignaciones viejas para luego insertar las nuevas
+    $stmt_del_assignees = $conn->prepare("DELETE FROM task_assignees WHERE taskId = ?");
+    $stmt_del_assignees->bind_param("s", $taskId); 
+    $stmt_del_assignees->execute(); 
+    $stmt_del_assignees->close();
+
+    if(!empty($data->assigneeIds)) {
+        $stmt_add_assignees = $conn->prepare("INSERT INTO task_assignees (taskId, userId) VALUES (?, ?)");
+        $stmt_notif = $conn->prepare("INSERT INTO notifications (id, userId, actorId, actionType, entityId) VALUES (?, ?, ?, ?, ?)");
+        
+        foreach ($data->assigneeIds as $assigneeId) { 
+            // Insertamos la nueva asignación
+            $stmt_add_assignees->bind_param("ss", $taskId, $assigneeId); 
+            $stmt_add_assignees->execute();
+
+            // --- LÓGICA DE NOTIFICACIÓN ---
+            // Si el nuevo asignado no estaba antes Y no es la misma persona que está editando la tarea, le enviamos una notificación.
+            if (!in_array($assigneeId, $current_assignee_ids) && $assigneeId !== $user_id) {
+                $notif_id = uniqid('notif_');
+                $actorId = $user_id; // El usuario que realiza la acción
+                $actionType = 'ASSIGNED_TASK';
+                $entityId = $taskId;
+                
+                $stmt_notif->bind_param("sssss", $notif_id, $assigneeId, $actorId, $actionType, $entityId);
+                $stmt_notif->execute();
+            }
+        }
+        $stmt_add_assignees->close();
+        $stmt_notif->close();
+    }
+}
     
     // Actualizar campos personalizados
     if (isset($data->customFields) && is_array($data->customFields)) {

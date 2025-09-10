@@ -3,7 +3,7 @@ import axios from 'axios';
 import type { Task, User, Workspace, CustomField } from '../types'; 
 
 // La URL base de tu API de PHP
-const API_URL = 'http://localhost/stratopia/api'; // O la ruta correcta donde tengas tu backend
+const API_URL = 'http://localhost:8008/stratopia/api'; // O la ruta correcta donde tengas tu backend
 
 const api = axios.create({
   baseURL: API_URL,
@@ -12,8 +12,10 @@ const api = axios.create({
 // Interceptor para añadir el token JWT a cada petición
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
+  // Corregido: El token no debe estar entre comillas extras si ya es un string
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+    const parsedToken = JSON.parse(token); // Asumiendo que el token se guarda como un string JSON
+    config.headers.Authorization = `Bearer ${parsedToken}`;
   }
   return config;
 });
@@ -44,8 +46,8 @@ interface UpdateTaskPayload {
 
 
 // --- Autenticación y Usuario ---
-export const login = (data: any) => api.post('/login.php', data);
-export const register = (data: any) => api.post('/register.php', data);
+export const loginUser = (data: any) => api.post('/login.php', data); // <-- NOMBRE CORREGIDO
+export const registerUser = (data: any) => api.post('/register.php', data); // <-- NOMBRE CORREGIDO
 export const getMe = () => api.get<User>('/getMe.php');
 
 // --- Workspaces (General) ---
@@ -53,7 +55,9 @@ export const getWorkspaces = () => api.get<Workspace[]>('/getWorkspaces.php');
 export const getWorkspaceMembers = (workspaceId: string) => api.get<User[]>(`/getWorkspaceMembers.php?workspaceId=${workspaceId}`);
 
 // --- Listas y Tareas ---
-export const getWorkspaceLists = (workspaceId: string) => api.get(`/getLists.php?workspaceId=${workspaceId}`);
+export const getWorkspaceLists = (workspaceId: string, groupBy: string) => 
+    api.get(`/getLists.php?workspaceId=${workspaceId}&groupBy=${groupBy}`);
+export const createList = (data: { workspaceId: string, name: string }) => api.post('/createList.php', data);
 export const createTask = (taskData: any) => api.post('/createTask.php', taskData);
 export const updateTask = (taskData: UpdateTaskPayload) => api.put('/updateTask.php', taskData);
 export const searchTasks = (workspaceId: string, searchTerm: string) => api.get<Task[]>(`/searchTasks.php?workspaceId=${workspaceId}&searchTerm=${searchTerm}`);
@@ -77,7 +81,6 @@ export const deleteAttachment = (attachmentId: string) => api.post('/deleteAttac
 // --- Comentarios ---
 export const getComments = (taskId: string) => api.get(`/getComments.php?taskId=${taskId}`);
 export const createComment = (data: { taskId: string; content: string }) => api.post('/createComment.php', data);
-
 
 /*
  * ===================================================================
@@ -107,3 +110,14 @@ export const createFieldOption = (optionData: any) => api.post('/createFieldOpti
 export const updateFieldOption = (optionData: any) => api.put('/updateFieldOption.php', optionData);
 export const deleteFieldOption = (optionId: string) => api.post('/deleteFieldOption.php', { optionId });
 export const updateFieldOptionsOrder = (optionIds: string[]) => api.put('/updateFieldOptionsOrder.php', { optionIds });
+
+// --- FUNCIONES PARA NOTIFICACIONES ---
+export const getNotifications = () => api.get('/getNotifications.php');
+export const markNotificationsAsRead = () => api.post('/markNotificationsAsRead.php');
+
+// --- AÑADE ESTAS FUNCIONES ---
+export const createTaskDependency = (data: { blockingTaskId: string, waitingTaskId: string }) => 
+    api.post('/createTaskDependency.php', data);
+
+export const deleteTaskDependency = (data: { blockingTaskId: string, waitingTaskId: string }) => 
+    api.post('/deleteTaskDependency.php', data);

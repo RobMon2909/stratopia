@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { getWorkspaces, createWorkspace, getWorkspaceLists, getCustomFields, getFieldOptions, updateTask, createList, getWorkspaceMembers, searchTasks } from '../services/api.ts'; 
+import { 
+    getWorkspaces, createWorkspace, getWorkspaceLists, getCustomFields, 
+    getFieldOptions, updateTask, getWorkspaceMembers, searchTasks, 
+    getNotifications, markNotificationsAsRead 
+} from '../services/api';
+import NotificationsPanel from '../components/NotificationsPanel.tsx';
+import type { Notification } from '../components/NotificationsPanel.tsx';
 import { useAuth } from '../hooks/useAuth.ts';
 import type { Task, List, Workspace, CustomField, FieldOption, User, NestedTask } from '../types';
 import TaskModal from '../components/TaskModal.tsx';
@@ -8,8 +14,11 @@ import TaskGrid from '../components/TaskGrid.tsx';
 import BoardView from '../components/BoardView.tsx';
 import CalendarView from '../components/CalendarView.tsx';
 import { useDebounce } from '../hooks/useDebounce.ts';
+import GanttView from '../components/GanttView.tsx'; // <-- AÑADIR IMPORTACIÓN
 
-type ViewType = 'list' | 'board' | 'calendar';
+
+type ViewType = 'list' | 'board' | 'calendar' | 'gantt';
+type GroupByOption = 'default' | 'priority' | 'dueDate' | 'assignee' | 'status';
 
 const DashboardPage: React.FC = () => {
     const { user, logout } = useAuth();
@@ -34,13 +43,20 @@ const DashboardPage: React.FC = () => {
     const [searchResults, setSearchResults] = useState<Task[] | null>(null);
     const [isSearching, setIsSearching] = useState(false);
     const debouncedSearchTerm = useDebounce(searchTerm, 500);
+    
+    // Estados para notificaciones y agrupación
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+    const [groupBy, setGroupBy] = useState<GroupByOption>('default');
+
+    const allTasks = useMemo(() => lists.reduce((acc, list) => [...acc, ...list.tasks], [] as Task[]), [lists]);
 
     const fetchDataForWorkspace = useCallback(async () => {
         if (!activeWorkspace) return;
         setLoadingData(true);
         try {
             const [listsRes, fieldsRes, membersRes] = await Promise.all([
-                getWorkspaceLists(activeWorkspace.id),
+                getWorkspaceLists(activeWorkspace.id, groupBy),
                 getCustomFields(activeWorkspace.id),
                 getWorkspaceMembers(activeWorkspace.id)
             ]);
@@ -59,7 +75,7 @@ const DashboardPage: React.FC = () => {
             }
         } catch (error) { console.error("Failed to fetch workspace data", error); } 
         finally { setLoadingData(false); }
-    }, [activeWorkspace]);
+    }, [activeWorkspace, groupBy]);
 
     useEffect(() => {
         if (user) {
@@ -71,11 +87,11 @@ const DashboardPage: React.FC = () => {
             }).catch(err => console.error("Failed to fetch workspaces", err))
             .finally(() => setLoadingWorkspaces(false));
         }
-    }, [user]);
+    }, [user, activeWorkspace]);
 
     useEffect(() => {
         fetchDataForWorkspace();
-    }, [activeWorkspace]);
+    }, [fetchDataForWorkspace]);
 
     useEffect(() => {
         if (debouncedSearchTerm && activeWorkspace) {
@@ -88,10 +104,32 @@ const DashboardPage: React.FC = () => {
             setSearchResults(null);
         }
     }, [debouncedSearchTerm, activeWorkspace]);
+
+    useEffect(() => {
+        const fetchNotifications = () => {
+            getNotifications()
+                .then(res => setNotifications(res.data))
+                .catch(err => console.error("Error fetching notifications:", err));
+        };
+        fetchNotifications();
+        const interval = setInterval(fetchNotifications, 30000);
+        return () => clearInterval(interval);
+    }, []);
+    
+    const unreadCount = useMemo(() => notifications.filter(n => !n.isRead).length, [notifications]);
+
+    const handleToggleNotifications = () => {
+        setIsNotificationsOpen(prev => !prev);
+        if (unreadCount > 0 && !isNotificationsOpen) {
+            markNotificationsAsRead()
+                .then(() => setNotifications(prev => prev.map(n => ({ ...n, isRead: 1 }))))
+                .catch(err => console.error("Failed to mark notifications as read", err));
+        }
+    };
     
     const handleCreateWorkspace = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newWorkspaceName.trim()) { return; }
+        if (!newWorkspaceName.trim()) return;
         setIsSubmittingWorkspace(true);
         try {
             const res = await createWorkspace({ name: newWorkspaceName });
@@ -103,7 +141,7 @@ const DashboardPage: React.FC = () => {
     };
 
     const handleOpenTaskModal = (task: Task | NestedTask | null, listId: string, parentId?: string) => {
-        setSelectedTask(task);
+        setSelectedTask(task as Task | null);
         if (!task) {
             setListIdForNewTask(listId);
             setParentIdForNewTask(parentId);
@@ -117,33 +155,19 @@ const DashboardPage: React.FC = () => {
     
     const handleDataNeedsRefresh = () => { fetchDataForWorkspace(); };
     
-    const handleTaskUpdated = async (updatedTaskData: Partial<Task> & { id: string }) => {
-        setLists(currentLists =>
-            currentLists.map(list => ({ ...list,
-                tasks: list.tasks.map(task => 
-                    task.id === updatedTaskData.id ? { ...task, ...updatedTaskData } : task
-                )
-            }))
-        );
-        try {
-             await updateTask({ taskId: updatedTaskData.id, ...updatedTaskData });
-             fetchDataForWorkspace();
-        } catch (error) {
-            console.error("Failed to update task", error);
-            alert("No se pudo guardar el cambio. Revertiendo.");
-            fetchDataForWorkspace();
-        }
+    const handleTaskUpdated = (updatedTask: any) => {
+        // Esta función ahora solo refresca los datos. 
+        // El guardado real se hace en el modal o en la vista de tablero.
+        fetchDataForWorkspace();
     };
     
     const handleFilterChange = (filterName: string, value: string) => {
         setActiveFilters(prev => ({ ...prev, [filterName]: value }));
     };
 
-    const allTasks = useMemo(() => lists.reduce((acc, list) => [...acc, ...list.tasks], [] as Task[]), [lists]);
     const tasksToDisplay = searchResults !== null ? searchResults : allTasks;
-    
-    const statusField = customFields.find(f => f.name.toLowerCase() === 'estado');
-    const statusOptions = statusField ? fieldOptions[statusField.id] || [] : [];
+    const statusField = useMemo(() => customFields.find(f => f.name.toLowerCase() === 'estado'), [customFields]);
+    const statusOptions = useMemo(() => (statusField ? fieldOptions[statusField.id] || [] : []), [statusField, fieldOptions]);
     
     const filteredTasks = useMemo(() => {
         return tasksToDisplay.filter(task => {
@@ -169,10 +193,13 @@ const DashboardPage: React.FC = () => {
             case 'board':
                 return <BoardView tasks={filteredTasks} statusField={statusField} statusOptions={statusOptions} customFields={customFields} onOpenTask={handleOpenTaskModal} onDataNeedsRefresh={handleDataNeedsRefresh} />;
             case 'calendar':
-                return <CalendarView tasks={filteredTasks} onOpenTask={handleOpenTaskModal} />;
+    return <CalendarView tasks={filteredTasks} onOpenTask={handleOpenTaskModal} onTaskUpdate={handleTaskUpdated} />;
+                // --- AÑADIR ESTE CASO ---
+            case 'gantt':
+                return <GanttView tasks={filteredTasks} onOpenTask={(task) => handleOpenTaskModal(task, task.listId)} />;
             case 'list':
             default:
-                return <TaskGrid tasks={filteredTasks} customFields={customFields} fieldOptions={fieldOptions} onOpenTask={handleOpenTaskModal} onTaskUpdate={handleTaskUpdated} />;
+                return <TaskGrid tasks={filteredTasks} customFields={customFields} fieldOptions={fieldOptions} onOpenTask={handleOpenTaskModal} onTaskUpdate={handleTaskUpdated} groupBy={groupBy} allUsers={workspaceMembers} statusOptions={statusOptions} statusField={statusField} />;
         }
     };
 
@@ -180,7 +207,7 @@ const DashboardPage: React.FC = () => {
 
     return (
         <div className="flex h-screen bg-white text-gray-800">
-            <TaskModal isOpen={isTaskModalOpen} onClose={handleCloseTaskModal} listId={selectedTask?.listId || listIdForNewTask} parentId={parentIdForNewTask} taskToEdit={selectedTask} onTaskCreated={handleDataNeedsRefresh} onTaskUpdated={handleDataNeedsRefresh} customFields={customFields} workspaceMembers={workspaceMembers} />
+            <TaskModal isOpen={isTaskModalOpen} onClose={handleCloseTaskModal} listId={selectedTask?.listId || listIdForNewTask} parentId={parentIdForNewTask} taskToEdit={selectedTask} onTaskCreated={handleDataNeedsRefresh} onDataNeedsRefresh={handleDataNeedsRefresh} customFields={customFields} workspaceMembers={workspaceMembers} allWorkspaceTasks={allTasks} />
             {isWorkspaceModalOpen && (
                  <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center" onClick={() => setIsWorkspaceModalOpen(false)}>
                     <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
@@ -203,9 +230,7 @@ const DashboardPage: React.FC = () => {
                     {user?.role === 'ADMIN' && (<button onClick={() => setIsWorkspaceModalOpen(true)} className="text-blue-500 hover:text-blue-700">+</button>)}
                 </div>
                 <nav className="flex-grow">
-                    <ul>
-                        {workspaces.map((ws) => (<li key={ws.id}><a href="#" onClick={(e) => { e.preventDefault(); setActiveWorkspace(ws); }} className={`block py-2 px-3 rounded font-medium ${activeWorkspace?.id === ws.id ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100 text-gray-600'}`}>{ws.name}</a></li>))}
-                    </ul>
+                    <ul>{workspaces.map((ws) => (<li key={ws.id}><a href="#" onClick={(e) => { e.preventDefault(); setActiveWorkspace(ws); }} className={`block py-2 px-3 rounded font-medium ${activeWorkspace?.id === ws.id ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100 text-gray-600'}`}>{ws.name}</a></li>))}</ul>
                 </nav>
                 {user?.role === 'ADMIN' && (<div className="mt-4 pt-4 border-t"><Link to="/admin" className="block py-2 px-3 rounded text-sm font-semibold text-gray-600 hover:bg-gray-100">Panel de Administrador</Link></div>)}
                  <div className="mt-auto pt-4 border-t">
@@ -221,51 +246,28 @@ const DashboardPage: React.FC = () => {
                         <div className="flex justify-between items-center mb-4 flex-shrink-0">
                             <div>
                                 <h1 className="text-4xl font-bold text-gray-800">{activeWorkspace.name}</h1>
-                                <div className="mt-2 flex items-center border-b">
-                                    <button onClick={() => setCurrentView('list')} className={`py-2 px-3 text-sm font-semibold ${currentView === 'list' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>Lista</button>
-                                    <button onClick={() => setCurrentView('board')} className={`py-2 px-3 text-sm font-semibold ${currentView === 'board' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>Tablero</button>
-                                    <button onClick={() => setCurrentView('calendar')} className={`py-2 px-3 text-sm font-semibold ${currentView === 'calendar' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>Calendario</button>
-                                </div>
+                                <div className="mt-2 flex items-center border-b"><button onClick={() => setCurrentView('list')} className={`py-2 px-3 text-sm font-semibold ${currentView === 'list' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>Lista</button><button onClick={() => setCurrentView('board')} className={`py-2 px-3 text-sm font-semibold ${currentView === 'board' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>Tablero</button><button onClick={() => setCurrentView('calendar')} className={`py-2 px-3 text-sm font-semibold ${currentView === 'calendar' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>Calendario</button><button onClick={() => setCurrentView('gantt')} className={`py-2 px-3 text-sm font-semibold ${currentView === 'gantt' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>Gantt</button></div>
                             </div>
                             <div className="flex items-center gap-4">
+                                <input type="text" placeholder="Buscar tareas..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="p-2 border rounded-md" />
+                                <div><label htmlFor="groupBy-select" className="text-xs font-semibold text-gray-500">AGRUPAR POR</label><select id="groupBy-select" value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupByOption)} className="ml-2 p-1 border-gray-300 rounded-md text-sm bg-white"><option value="default">Por defecto</option><option value="priority">Prioridad</option><option value="dueDate">Fecha Límite</option><option value="assignee">Asignado</option><option value="status">Estado</option></select></div>
+                                {statusField && (<div><label htmlFor="status-filter" className="text-xs font-semibold text-gray-500">ESTADO</label><select id="status-filter" value={activeFilters.statusId} onChange={(e) => handleFilterChange('statusId', e.target.value)} className="ml-2 p-1 border-gray-300 rounded-md text-sm bg-white"><option value="all">Todos</option>{statusOptions.map(option => (<option key={option.id} value={option.id}>{option.value}</option>))}</select></div>)}
+                                <div><label htmlFor="assignee-filter" className="text-xs font-semibold text-gray-500">ASIGNADO</label><select id="assignee-filter" value={activeFilters.assigneeId} onChange={(e) => handleFilterChange('assigneeId', e.target.value)} className="ml-2 p-1 border-gray-300 rounded-md text-sm bg-white"><option value="all">Todos</option>{workspaceMembers.map(member => (<option key={member.id} value={member.id}>{member.name}</option>))}</select></div>
                                 <div className="relative">
-                                    <input type="text" placeholder="Buscar tareas..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="p-2 border rounded-md pl-8" />
-                                    <svg className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                    <button onClick={handleToggleNotifications} className="relative p-2 rounded-full hover:bg-gray-100">
+                                        <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 00-5-5.917V5a1 1 0 10-2 0v.083A6 6 0 006 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                                        {unreadCount > 0 && (<span className="absolute top-1 right-1 block h-3 w-3 rounded-full bg-red-500 border-2 border-white"></span>)}
+                                    </button>
+                                    {isNotificationsOpen && (<NotificationsPanel notifications={notifications} onClose={() => setIsNotificationsOpen(false)} />)}
                                 </div>
-                                {statusField && (
-                                    <div>
-                                        <label htmlFor="status-filter" className="text-xs font-semibold text-gray-500">ESTADO</label>
-                                        <select id="status-filter" value={activeFilters.statusId} onChange={(e) => handleFilterChange('statusId', e.target.value)} className="ml-2 p-1 border-gray-300 rounded-md text-sm bg-white">
-                                            <option value="all">Todos</option>
-                                            {statusOptions.map(option => (
-                                                <option key={option.id} value={option.id}>{option.value}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
-                                <div>
-                                    <label htmlFor="assignee-filter" className="text-xs font-semibold text-gray-500">ASIGNADO</label>
-                                    <select id="assignee-filter" value={activeFilters.assigneeId} onChange={(e) => handleFilterChange('assigneeId', e.target.value)} className="ml-2 p-1 border-gray-300 rounded-md text-sm bg-white">
-                                        <option value="all">Todos</option>
-                                        {workspaceMembers.map(member => (
-                                            <option key={member.id} value={member.id}>{member.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <button onClick={() => handleOpenTaskModal(null, lists[0]?.id)} className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow font-semibold hover:bg-blue-700 disabled:bg-blue-300" disabled={lists.length === 0}>
-                                    + Añadir Tarea
-                                </button>
                             </div>
                         </div>
                         <div className="flex-grow overflow-y-auto">
-                        {loadingData || isSearching ? ( <p>Cargando...</p> ) : renderCurrentView()}
+                        {loadingData || isSearching ? ( <div className="text-center p-10">Cargando datos...</div> ) : renderCurrentView()}
                         </div>
                     </>
                 ) : (
-                    <div className="text-center my-auto">
-                       <h2 className="text-2xl font-semibold">¡Bienvenido a Stratopia!</h2>
-                       <p className="text-gray-500 mt-2">Selecciona un espacio de trabajo para comenzar.</p>
-                    </div>
+                    <div className="text-center my-auto"><h2 className="text-2xl font-semibold">¡Bienvenido a Stratopia!</h2><p className="text-gray-500 mt-2">Selecciona un espacio de trabajo o crea uno nuevo para comenzar.</p></div>
                 )}
             </main>
         </div>

@@ -1,33 +1,45 @@
-import React from 'react';
+// src/components/CalendarView.tsx
+
+import React, { useMemo } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import type { Task } from '../types';
+import type { Task, NestedTask } from '../types';
 
 interface CalendarViewProps {
     tasks: Task[];
-    onOpenTask: (task: Task, listId: string) => void;
+    onOpenTask: (task: Task | NestedTask | null, listId: string) => void;
+    onTaskUpdate: (updatedTask: any) => void;
 }
 
-const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onOpenTask }) => {
+const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onOpenTask, onTaskUpdate }) => {
 
-    const events = tasks
-        .filter(task => task.dueDate) // Filtra tareas que no tienen fecha
-        .map(task => ({
-            id: task.id,
-            title: task.title,
-            // Aserción de Tipo: Le decimos a TypeScript que confíe en que esto es un string
-            date: task.dueDate as string, 
-            extendedProps: {
-                originalTask: task
-            }
-        }));
-
-    const handleEventClick = (clickInfo: any) => {
-        const task = clickInfo.event.extendedProps.originalTask;
-        if (task) {
-            onOpenTask(task, task.listId);
-        }
+    // --- LÓGICA CORREGIDA PARA CREAR LOS EVENTOS ---
+    const events = useMemo(() => {
+        return tasks
+            // 1. Nos aseguramos de que cada tarea tenga al menos una fecha de entrega (dueDate).
+            .filter(task => !!task.dueDate)
+            // 2. Mapeamos las tareas al formato que FullCalendar espera.
+            .map(task => ({
+                id: task.id,
+                title: task.title,
+                // Si no hay fecha de inicio, usamos la de entrega como inicio.
+                // El '!' al final le dice a TypeScript que estamos seguros de que dueDate no es null aquí.
+                start: task.startDate || task.dueDate!,
+                end: task.dueDate!,
+                allDay: !task.startDate,
+                extendedProps: { listId: task.listId }
+            }));
+    }, [tasks]);
+    
+    const handleEventDrop = (info: any) => {
+        const { event } = info;
+        const updatedTask = {
+            taskId: event.id,
+            startDate: event.startStr,
+            dueDate: event.endStr || event.startStr
+        };
+        onTaskUpdate(updatedTask);
     };
 
     return (
@@ -35,21 +47,16 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onOpenTask }) => {
             <FullCalendar
                 plugins={[dayGridPlugin, interactionPlugin]}
                 initialView="dayGridMonth"
-                headerToolbar={{
-                    left: 'prev,next today',
-                    center: 'title',
-                    right: 'dayGridMonth,dayGridWeek'
-                }}
                 events={events}
-                eventClick={handleEventClick}
-                locale="es"
-                buttonText={{
-                    today: 'Hoy',
-                    month: 'Mes',
-                    week: 'Semana',
+                eventClick={(info) => {
+                    const task = tasks.find(t => t.id === info.event.id);
+                    if (task) {
+                        onOpenTask(task, task.listId);
+                    }
                 }}
+                editable={true}
+                eventDrop={handleEventDrop}
                 height="100%"
-                editable={true} 
             />
         </div>
     );
