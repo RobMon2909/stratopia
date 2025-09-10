@@ -14,10 +14,11 @@ import TaskGrid from '../components/TaskGrid.tsx';
 import BoardView from '../components/BoardView.tsx';
 import CalendarView from '../components/CalendarView.tsx';
 import { useDebounce } from '../hooks/useDebounce.ts';
-import GanttView from '../components/GanttView.tsx'; // <-- AÑADIR IMPORTACIÓN
+import socketService from '../services/socketService'; // <-- IMPORTAR EL SERVICIO
 
 
-type ViewType = 'list' | 'board' | 'calendar' | 'gantt';
+
+type ViewType = 'list' | 'board' | 'calendar';
 type GroupByOption = 'default' | 'priority' | 'dueDate' | 'assignee' | 'status';
 
 const DashboardPage: React.FC = () => {
@@ -76,6 +77,25 @@ const DashboardPage: React.FC = () => {
         } catch (error) { console.error("Failed to fetch workspace data", error); } 
         finally { setLoadingData(false); }
     }, [activeWorkspace, groupBy]);
+// --- CONECTAR Y ESCUCHAR AL WEBSOCKET ---
+    useEffect(() => {
+        // Conectamos cuando el componente se monta
+        socketService.connect();
+
+        // Empezamos a escuchar el evento 'task_updated'
+        socketService.on('task_updated', (data) => {
+            console.log('Received task update for task ID:', data.taskId);
+            // Cuando recibimos una actualización, simplemente volvemos a pedir todos los datos.
+            // Es la forma más simple y robusta de asegurar que la UI esté sincronizada.
+            fetchDataForWorkspace();
+        });
+
+        // Nos desconectamos cuando el componente se desmonta para limpiar
+        return () => {
+            socketService.disconnect();
+        };
+    }, [fetchDataForWorkspace]); // fetchDataForWorkspace debe estar envuelta en useCallback
+
 
     useEffect(() => {
         if (user) {
@@ -193,10 +213,7 @@ const DashboardPage: React.FC = () => {
             case 'board':
                 return <BoardView tasks={filteredTasks} statusField={statusField} statusOptions={statusOptions} customFields={customFields} onOpenTask={handleOpenTaskModal} onDataNeedsRefresh={handleDataNeedsRefresh} />;
             case 'calendar':
-    return <CalendarView tasks={filteredTasks} onOpenTask={handleOpenTaskModal} onTaskUpdate={handleTaskUpdated} />;
-                // --- AÑADIR ESTE CASO ---
-            case 'gantt':
-                return <GanttView tasks={filteredTasks} onOpenTask={(task) => handleOpenTaskModal(task, task.listId)} />;
+    return <CalendarView tasks={filteredTasks} onOpenTask={handleOpenTaskModal} onDataNeedsRefresh={handleDataNeedsRefresh} />;
             case 'list':
             default:
                 return <TaskGrid tasks={filteredTasks} customFields={customFields} fieldOptions={fieldOptions} onOpenTask={handleOpenTaskModal} onTaskUpdate={handleTaskUpdated} groupBy={groupBy} allUsers={workspaceMembers} statusOptions={statusOptions} statusField={statusField} />;
@@ -246,13 +263,22 @@ const DashboardPage: React.FC = () => {
                         <div className="flex justify-between items-center mb-4 flex-shrink-0">
                             <div>
                                 <h1 className="text-4xl font-bold text-gray-800">{activeWorkspace.name}</h1>
-                                <div className="mt-2 flex items-center border-b"><button onClick={() => setCurrentView('list')} className={`py-2 px-3 text-sm font-semibold ${currentView === 'list' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>Lista</button><button onClick={() => setCurrentView('board')} className={`py-2 px-3 text-sm font-semibold ${currentView === 'board' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>Tablero</button><button onClick={() => setCurrentView('calendar')} className={`py-2 px-3 text-sm font-semibold ${currentView === 'calendar' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>Calendario</button><button onClick={() => setCurrentView('gantt')} className={`py-2 px-3 text-sm font-semibold ${currentView === 'gantt' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>Gantt</button></div>
+                                <div className="mt-2 flex items-center border-b"><button onClick={() => setCurrentView('list')} className={`py-2 px-3 text-sm font-semibold ${currentView === 'list' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>Lista</button><button onClick={() => setCurrentView('board')} className={`py-2 px-3 text-sm font-semibold ${currentView === 'board' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>Tablero</button><button onClick={() => setCurrentView('calendar')} className={`py-2 px-3 text-sm font-semibold ${currentView === 'calendar' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>Calendario</button></div>
                             </div>
                             <div className="flex items-center gap-4">
                                 <input type="text" placeholder="Buscar tareas..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="p-2 border rounded-md" />
                                 <div><label htmlFor="groupBy-select" className="text-xs font-semibold text-gray-500">AGRUPAR POR</label><select id="groupBy-select" value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupByOption)} className="ml-2 p-1 border-gray-300 rounded-md text-sm bg-white"><option value="default">Por defecto</option><option value="priority">Prioridad</option><option value="dueDate">Fecha Límite</option><option value="assignee">Asignado</option><option value="status">Estado</option></select></div>
                                 {statusField && (<div><label htmlFor="status-filter" className="text-xs font-semibold text-gray-500">ESTADO</label><select id="status-filter" value={activeFilters.statusId} onChange={(e) => handleFilterChange('statusId', e.target.value)} className="ml-2 p-1 border-gray-300 rounded-md text-sm bg-white"><option value="all">Todos</option>{statusOptions.map(option => (<option key={option.id} value={option.id}>{option.value}</option>))}</select></div>)}
                                 <div><label htmlFor="assignee-filter" className="text-xs font-semibold text-gray-500">ASIGNADO</label><select id="assignee-filter" value={activeFilters.assigneeId} onChange={(e) => handleFilterChange('assigneeId', e.target.value)} className="ml-2 p-1 border-gray-300 rounded-md text-sm bg-white"><option value="all">Todos</option>{workspaceMembers.map(member => (<option key={member.id} value={member.id}>{member.name}</option>))}</select></div>
+                                {/* --- BOTÓN "AÑADIR TAREA" RE-AÑADIDO --- */}
+                                <button 
+                                    onClick={() => handleOpenTaskModal(null, lists[0]?.id)} 
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow font-semibold hover:bg-blue-700 disabled:bg-blue-300" 
+                                    disabled={lists.length === 0}
+                                    title={lists.length === 0 ? "Crea una lista primero" : "Añadir nueva tarea"}
+                                >
+                                    + Añadir Tarea
+                                </button>
                                 <div className="relative">
                                     <button onClick={handleToggleNotifications} className="relative p-2 rounded-full hover:bg-gray-100">
                                         <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 00-5-5.917V5a1 1 0 10-2 0v.083A6 6 0 006 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>

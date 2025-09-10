@@ -1,0 +1,12 @@
+{
+    "name": "hp/stratopia",
+    "authors": [
+        {
+            "name": "RobMon2909",
+            "email": "rob.mon.2909@gmail.com"
+        }
+    ],
+    "require": {
+        "cboden/ratchet": "^0.4.4"
+    }
+}

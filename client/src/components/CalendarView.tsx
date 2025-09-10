@@ -4,27 +4,23 @@ import React, { useMemo } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import { updateTask } from '../services/api'; // <-- IMPORTAMOS LA FUNCIÓN DE LA API
 import type { Task, NestedTask } from '../types';
 
 interface CalendarViewProps {
     tasks: Task[];
     onOpenTask: (task: Task | NestedTask | null, listId: string) => void;
-    onTaskUpdate: (updatedTask: any) => void;
+    onDataNeedsRefresh: () => void; // <-- CAMBIAMOS EL NOMBRE PARA CLARIDAD
 }
 
-const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onOpenTask, onTaskUpdate }) => {
+const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onOpenTask, onDataNeedsRefresh }) => {
 
-    // --- LÓGICA CORREGIDA PARA CREAR LOS EVENTOS ---
     const events = useMemo(() => {
         return tasks
-            // 1. Nos aseguramos de que cada tarea tenga al menos una fecha de entrega (dueDate).
             .filter(task => !!task.dueDate)
-            // 2. Mapeamos las tareas al formato que FullCalendar espera.
             .map(task => ({
                 id: task.id,
                 title: task.title,
-                // Si no hay fecha de inicio, usamos la de entrega como inicio.
-                // El '!' al final le dice a TypeScript que estamos seguros de que dueDate no es null aquí.
                 start: task.startDate || task.dueDate!,
                 end: task.dueDate!,
                 allDay: !task.startDate,
@@ -32,14 +28,28 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onOpenTask, onTaskUp
             }));
     }, [tasks]);
     
-    const handleEventDrop = (info: any) => {
-        const { event } = info;
-        const updatedTask = {
+    // --- LÓGICA CORREGIDA PARA GUARDAR EL CAMBIO ---
+    const handleEventDrop = async (info: any) => {
+        const { event, oldEvent } = info;
+        const updatedTaskPayload = {
             taskId: event.id,
             startDate: event.startStr,
             dueDate: event.endStr || event.startStr
         };
-        onTaskUpdate(updatedTask);
+
+        try {
+            // 1. Enviamos la actualización al backend
+            await updateTask(updatedTaskPayload);
+            // 2. (Opcional) Mostramos una confirmación
+            console.log(`Tarea "${event.title}" movida a ${event.startStr}`);
+            // 3. Pedimos al dashboard que refresque todos los datos para mantener la consistencia
+            onDataNeedsRefresh();
+        } catch (error) {
+            console.error("Failed to update task date", error);
+            alert("No se pudo guardar el cambio de fecha.");
+            // Si falla, revertimos el evento a su posición original en la UI
+            info.revert();
+        }
     };
 
     return (

@@ -1,27 +1,3 @@
-/* src/index.css */
-
-/* --- PASO 1: Importar los estilos de la librería PRIMERO --- */
-@import 'frappe-gantt/dist/frappe-gantt.css';
-
-/* --- PASO 2: Incluir las directivas de Tailwind DESPUÉS --- */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* --- PASO 3: (Opcional) Añadir nuestras mejoras visuales AL FINAL --- */
-.gantt .grid-header, .gantt .date {
-  fill: #6b7280; /* Texto gris para las cabeceras */
-  font-weight: 600;
-  font-size: 12px;
-}
-
-.gantt .bar-label {
-  fill: #fff; /* Texto blanco para las etiquetas de las barras */
-  font-weight: 500;
-  dominant-baseline: central;
-  text-anchor: middle;
-}
-
-.gantt .bar-progress {
-  fill: rgba(0, 0, 0, 0.2); /* Color del progreso dentro de la barra */
-}

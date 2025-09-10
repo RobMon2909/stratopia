@@ -162,9 +162,20 @@ const BoardView: React.FC<BoardViewProps> = ({ tasks, statusField, statusOptions
                             <span className="px-2 py-1 rounded text-xs font-bold" style={{ backgroundColor: column.color + '30', color: column.color }}>{column.name}</span>
                             <span className="ml-2 text-gray-500">{column.items.length}</span>
                         </div>
-                        <Droppable droppableId={columnId}>
+                        <Droppable 
+                            droppableId={columnId} 
+                            isDropDisabled={columnId === 'unassigned'} // <-- ESTA LÍNEA ES LA MAGIA
+                        >
                             {(provided, snapshot) => (
-                                <div {...provided.droppableProps} ref={provided.innerRef} className={`p-3 flex-grow min-h-[100px] rounded-b-lg transition-colors duration-300 ${snapshot.isDraggingOver ? 'bg-blue-100' : ''}`}>
+                                <div 
+                                    {...provided.droppableProps} 
+                                    ref={provided.innerRef} 
+                                    // Añadimos un estilo visual para indicar que no se puede soltar
+                                    className={`p-3 flex-grow min-h-[100px] rounded-b-lg transition-colors duration-300 
+                                    ${snapshot.isDraggingOver ? 'bg-blue-100' : ''}
+                                    ${columnId === 'unassigned' ? 'opacity-70' : ''}
+                                    `}
+                                >
                                     {column.items.map((item, index) => (
                                         <Draggable key={item.id} draggableId={item.id} index={index}>
                                             {(provided) => (

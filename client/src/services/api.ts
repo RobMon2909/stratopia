@@ -1,9 +1,8 @@
 import axios from 'axios';
 // Asegúrate de que la ruta a tus tipos sea correcta
 import type { Task, User, Workspace, CustomField } from '../types'; 
+export const API_URL = 'http://localhost:8008/stratopia/api'; 
 
-// La URL base de tu API de PHP
-const API_URL = 'http://localhost:8008/stratopia/api'; // O la ruta correcta donde tengas tu backend
 
 const api = axios.create({
   baseURL: API_URL,
