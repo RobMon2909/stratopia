@@ -1,8 +1,9 @@
 import axios from 'axios';
-import type { Task } from '../types';
+// Asegúrate de que la ruta a tus tipos sea correcta
+import type { Task, User, Workspace, CustomField } from '../types'; 
 
 // La URL base de tu API de PHP
-const API_URL = 'http://localhost:5000/stratopia/api'; // Asegúrate que esta ruta sea correcta
+const API_URL = 'http://localhost/stratopia/api'; // O la ruta correcta donde tengas tu backend
 
 const api = axios.create({
   baseURL: API_URL,
@@ -17,24 +18,48 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+/*
+ * ===================================================================
+ * TIPOS DE PAYLOAD ESPECÍFICOS PARA CORREGIR ERRORES DE TYPESCRIPT
+ * ===================================================================
+ */
+interface CustomFieldPayload {
+    fieldId: string;
+    value?: any;
+    valueId?: string;
+    optionId?: string | null;
+    optionIds?: string[];
+    type?: string;
+}
+
+interface UpdateTaskPayload {
+    taskId: string;
+    title?: string;
+    description?: string;
+    dueDate?: string | null;
+    priority?: string | null;
+    assigneeIds?: string[];
+    customFields?: CustomFieldPayload[];
+}
+
+
 // --- Autenticación y Usuario ---
 export const login = (data: any) => api.post('/login.php', data);
 export const register = (data: any) => api.post('/register.php', data);
-export const getMe = () => api.get('/getMe.php');
+export const getMe = () => api.get<User>('/getMe.php');
 
-// --- Workspaces ---
-export const getWorkspaces = () => api.get('/getWorkspaces.php');
-export const createWorkspace = (data: { name: string }) => api.post('/createWorkspace.php', data);
-export const getWorkspaceMembers = (workspaceId: string) => api.get(`/getWorkspaceMembers.php?workspaceId=${workspaceId}`);
+// --- Workspaces (General) ---
+export const getWorkspaces = () => api.get<Workspace[]>('/getWorkspaces.php');
+export const getWorkspaceMembers = (workspaceId: string) => api.get<User[]>(`/getWorkspaceMembers.php?workspaceId=${workspaceId}`);
 
 // --- Listas y Tareas ---
 export const getWorkspaceLists = (workspaceId: string) => api.get(`/getLists.php?workspaceId=${workspaceId}`);
 export const createTask = (taskData: any) => api.post('/createTask.php', taskData);
-export const updateTask = (taskData: Partial<Task> & { taskId: string }) => api.put('/updateTask.php', taskData);
-export const searchTasks = (workspaceId: string, searchTerm: string) => api.get(`/searchTasks.php?workspaceId=${workspaceId}&searchTerm=${searchTerm}`);
+export const updateTask = (taskData: UpdateTaskPayload) => api.put('/updateTask.php', taskData);
+export const searchTasks = (workspaceId: string, searchTerm: string) => api.get<Task[]>(`/searchTasks.php?workspaceId=${workspaceId}&searchTerm=${searchTerm}`);
 
-// --- Campos Personalizados ---
-export const getCustomFields = (workspaceId: string) => api.get(`/getCustomFields.php?workspaceId=${workspaceId}`);
+// --- Campos Personalizados (General) ---
+export const getCustomFields = (workspaceId: string) => api.get<CustomField[]>(`/getCustomFields.php?workspaceId=${workspaceId}`);
 export const getFieldOptions = (fieldId: string) => api.get(`/getFieldOptions.php?fieldId=${fieldId}`);
 
 // --- Archivos Adjuntos ---
@@ -49,12 +74,36 @@ export const uploadAttachment = (taskId: string, file: File) => {
 };
 export const deleteAttachment = (attachmentId: string) => api.post('/deleteAttachment.php', { attachmentId });
 
-
-// --- NUEVAS FUNCIONES PARA COMENTARIOS ---
+// --- Comentarios ---
 export const getComments = (taskId: string) => api.get(`/getComments.php?taskId=${taskId}`);
 export const createComment = (data: { taskId: string; content: string }) => api.post('/createComment.php', data);
 
-// --- Admin (Si tienes más, añádelas aquí) ---
-// Nota: No he visto el código del frontend para el panel de admin, así que estas son suposiciones basadas en tus archivos PHP.
-export const adminGetAllUsers = () => api.get('/getUsers.php');
-export const adminUpdateUser = (userData: any) => api.put('/updateUser.php', userData);
+
+/*
+ * ===================================================================
+ * FUNCIONES PARA EL PANEL DE ADMINISTRADOR
+ * ===================================================================
+ */
+
+// --- Gestión de Usuarios (Admin) ---
+export const getAllUsers = () => api.get<User[]>('/getUsers.php');
+export const createUser = (userData: any) => api.post('/createUser.php', userData);
+export const updateUser = (userData: any) => api.put('/updateUser.php', userData);
+export const deleteUser = (userId: string) => api.post('/deleteUser.php', { userId });
+export const getUserWorkspaces = (userId: string) => api.get<string[]>(`/getUserWorkspaces.php?userId=${userId}`);
+export const updateUserWorkspaces = (userId: string, workspaceIds: string[]) => api.put('/updateUserWorkspaces.php', { userId, workspaceIds });
+
+// --- Gestión de Workspaces (Admin) ---
+export const adminGetAllWorkspaces = () => api.get<Workspace[]>('/adminGetAllWorkspaces.php');
+export const createWorkspace = (data: { name: string }) => api.post('/createWorkspace.php', data);
+export const updateWorkspace = (workspaceData: any) => api.put('/updateWorkspace.php', workspaceData);
+export const deleteWorkspace = (workspaceId: string) => api.post('/deleteWorkspace.php', { workspaceId });
+
+// --- Gestión de Campos Personalizados (Admin) ---
+export const createCustomField = (data: { name: string; type: string; workspaceId: string }) => api.post('/createCustomField.php', data);
+export const updateCustomField = (fieldData: any) => api.put('/updateCustomField.php', fieldData);
+export const deleteCustomField = (fieldId: string) => api.post('/deleteCustomField.php', { fieldId });
+export const createFieldOption = (optionData: any) => api.post('/createFieldOption.php', optionData);
+export const updateFieldOption = (optionData: any) => api.put('/updateFieldOption.php', optionData);
+export const deleteFieldOption = (optionId: string) => api.post('/deleteFieldOption.php', { optionId });
+export const updateFieldOptionsOrder = (optionIds: string[]) => api.put('/updateFieldOptionsOrder.php', { optionIds });
