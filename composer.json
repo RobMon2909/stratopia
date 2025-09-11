@@ -8,6 +8,7 @@
     ],
     "require": {
         "cboden/ratchet": "^0.4.4",
-        "react/http": "^1.11"
+        "react/http": "^1.11",
+        "phpmailer/phpmailer": "^6.10"
     }
 }

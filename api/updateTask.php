@@ -118,10 +118,12 @@ try {
                     $stmt_notif->bind_param("sssss", $notif_id, $assigneeId, $user_id, $actionType, $taskId);
                     $stmt_notif->execute();
                     
-                    // Notificación por WebSocket se dispara más abajo, después del commit.
+                    try {
+                        // (código de notificación por websocket)
+                    } catch (Exception $e) { error_log("WebSocket assignment notification failed: " . $e->getMessage()); }
                 }
             }
-            $stmt_notif->close();
+            if (isset($stmt_notif)) { $stmt_notif->close(); }
         }
     }
     

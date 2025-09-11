@@ -22,20 +22,15 @@ const TaskGrid: React.FC<TaskGridProps> = ({ tasks, customFields, fieldOptions, 
     const groupedTasks = useMemo(() => {
         const topLevelNestedTasks: NestedTask[] = nestTasks(tasks);
         const groups = new Map<string, NestedTask[]>();
-
-        // Identificamos el campo de Prioridad una sola vez
         const priorityField = customFields.find(f => f.name.toLowerCase() === 'prioridad');
 
-        // Si la agrupación es por defecto, metemos todo en un solo grupo y terminamos.
         if (groupBy === 'default') {
             groups.set('Todas las Tareas', topLevelNestedTasks);
             return groups;
         }
 
-        // Si no, recorremos cada tarea para asignarla a un grupo
         topLevelNestedTasks.forEach(task => {
-            let groupKey = 'Sin Agrupar'; // Valor por defecto
-
+            let groupKey: string = 'Sin Agrupar';
             switch (groupBy) {
                 case 'priority':
                     if (priorityField && task.customFields?.[priorityField.id]?.optionId) {
@@ -58,7 +53,7 @@ const TaskGrid: React.FC<TaskGridProps> = ({ tasks, customFields, fieldOptions, 
                     break;
                 case 'assignee':
                     if (task.assignees && task.assignees.length > 0) {
-                        groupKey = task.assignees[0].name; // Agrupamos por el primer asignado
+                        groupKey = task.assignees[0].name;
                     } else {
                         groupKey = 'Sin Asignar';
                     }
@@ -71,23 +66,21 @@ const TaskGrid: React.FC<TaskGridProps> = ({ tasks, customFields, fieldOptions, 
                     }
                     break;
             }
-            
             if (!groups.has(groupKey)) {
                 groups.set(groupKey, []);
             }
             groups.get(groupKey)!.push(task);
         });
-
         return groups;
     }, [tasks, groupBy, customFields, fieldOptions, allUsers, statusField, statusOptions]);
-
 
     if (tasks.length === 0) {
         return <div className="text-center p-10 bg-gray-50 rounded-lg"><h3 className="text-lg font-medium text-gray-500">No hay tareas que coincidan.</h3><p className="text-sm text-gray-400">Prueba a cambiar los filtros o a crear una nueva tarea.</p></div>
     }
+
     // --- CORRECCIÓN EN EL ENCABEZADO DE LA TABLA ---
     const headerCustomFields = customFields.filter(f => f.name.toLowerCase() !== 'prioridad');
-    const totalColumns = 4 + headerCustomFields.length; // 4 columnas base + campos personalizados
+    const totalColumns = 4 + headerCustomFields.length;
 
     return (
         <div className="w-full overflow-x-auto bg-white rounded-lg shadow-md">
@@ -98,7 +91,7 @@ const TaskGrid: React.FC<TaskGridProps> = ({ tasks, customFields, fieldOptions, 
                         <th scope="col" className="px-6 py-3">Fecha Límite</th>
                         <th scope="col" className="px-6 py-3">Asignado</th>
                         <th scope="col" className="px-6 py-3">Prioridad</th>
-                        {/* Ahora solo filtramos "Prioridad", por lo que "Estado" y otros se mostrarán */}
+                        {/* Se asegura de mostrar todos los demás campos personalizados */}
                         {headerCustomFields.map(field => (<th key={field.id} scope="col" className="px-6 py-3">{field.name}</th>))}
                         <th scope="col" className="px-4 py-3 w-[100px]"><span className="sr-only">Acciones</span></th>
                     </tr>
@@ -112,15 +105,7 @@ const TaskGrid: React.FC<TaskGridProps> = ({ tasks, customFields, fieldOptions, 
                             </td>
                         </tr>
                         {tasksInGroup.map(task => (
-                            <TaskRow 
-                                key={task.id} 
-                                task={task} 
-                                customFields={customFields} 
-                                fieldOptions={fieldOptions} 
-                                onOpenTask={onOpenTask} 
-                                onTaskUpdate={onTaskUpdate} 
-                                level={0} 
-                            />
+                            <TaskRow key={task.id} task={task} customFields={customFields} fieldOptions={fieldOptions} onOpenTask={onOpenTask} onTaskUpdate={onTaskUpdate} level={0} />
                         ))}
                          <tr className="hover:bg-gray-50">
                             <td colSpan={totalColumns} className="px-6 py-2">
@@ -135,5 +120,4 @@ const TaskGrid: React.FC<TaskGridProps> = ({ tasks, customFields, fieldOptions, 
         </div>
     );
 };
-
 export default TaskGrid;
