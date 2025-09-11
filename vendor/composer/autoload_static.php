@@ -27,6 +27,7 @@ class ComposerStaticInit3e24601f66164562344a064cf5bd23a2
             'React\\Stream\\' => 13,
             'React\\Socket\\' => 13,
             'React\\Promise\\' => 14,
+            'React\\Http\\' => 11,
             'React\\EventLoop\\' => 16,
             'React\\Dns\\' => 10,
             'React\\Cache\\' => 12,
@@ -40,6 +41,10 @@ class ComposerStaticInit3e24601f66164562344a064cf5bd23a2
         'G' => 
         array (
             'GuzzleHttp\\Psr7\\' => 16,
+        ),
+        'F' => 
+        array (
+            'Fig\\Http\\Message\\' => 17,
         ),
         'E' => 
         array (
@@ -76,6 +81,10 @@ class ComposerStaticInit3e24601f66164562344a064cf5bd23a2
         array (
             0 => __DIR__ . '/..' . '/react/promise/src',
         ),
+        'React\\Http\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/react/http/src',
+        ),
         'React\\EventLoop\\' => 
         array (
             0 => __DIR__ . '/..' . '/react/event-loop/src',
@@ -104,6 +113,10 @@ class ComposerStaticInit3e24601f66164562344a064cf5bd23a2
         'GuzzleHttp\\Psr7\\' => 
         array (
             0 => __DIR__ . '/..' . '/guzzlehttp/psr7/src',
+        ),
+        'Fig\\Http\\Message\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/fig/http-message-util/src',
         ),
         'Evenement\\' => 
         array (

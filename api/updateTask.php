@@ -75,6 +75,7 @@ try {
     $decoded = JWT::decode($jwt, new Key("UNA_CLAVE_SECRETA_PARA_STRATOPIA", 'HS256'));
     $user_id = $decoded->data->id;
     $user_role = $decoded->data->role;
+    $userName = $decoded->data->name; // Obtenemos el nombre del usuario que hace la acción
     $taskId = $data->taskId;
     
     $conn->begin_transaction();

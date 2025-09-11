@@ -1,74 +1,54 @@
 <?php
-// --- LÍNEAS DE DEPURACIÓN ---
-// Frozamos a PHP a mostrar cualquier error que esté ocurriendo.
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
-// --------------------------------
 
 require 'db.php';
 require 'vendor/autoload.php';
 use \Firebase\JWT\JWT;
 use \Firebase\JWT\Key;
 
-// Lógica de token y permisos de Admin (verificamos que quien pide es un Admin)
-$authHeader = null; 
-if (isset($_SERVER['Authorization'])) { $authHeader = $_SERVER['Authorization']; } 
-else if (isset($_SERVER['HTTP_AUTHORIZATION'])) { $authHeader = $_SERVER['HTTP_AUTHORIZATION']; } 
-
-if (!$authHeader) { 
-    http_response_code(401); 
-    die(json_encode(["message"=>"Encabezado de autorización no encontrado."]));
-}
+// --- Autenticación y obtención de IDs ---
+$authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+if (!$authHeader) { http_response_code(401); die(json_encode(["message"=>"Encabezado de autorización no encontrado."]));}
 $arr = explode(" ", $authHeader);
 $jwt = $arr[1] ?? '';
 
+$workspaceId = $_GET['workspaceId'] ?? '';
+if (!$workspaceId) {
+    http_response_code(400); die(json_encode(["message" => "Workspace ID es requerido."]));
+}
+
 try {
     $decoded = JWT::decode($jwt, new Key("UNA_CLAVE_SECRETA_PARA_STRATOPIA", 'HS256'));
-    $admin_id = $decoded->data->id;
-    
-    $stmt_role = $conn->prepare("SELECT role FROM users WHERE id = ?");
-    $stmt_role->bind_param("s", $admin_id);
-    $stmt_role->execute();
-    $result_role = $stmt_role->get_result()->fetch_assoc();
-    
-    if (!$result_role || $result_role['role'] !== 'ADMIN') {
+    $user_id = $decoded->data->id;
+
+    // --- LÓGICA DE PERMISOS CORREGIDA ---
+    // En lugar de verificar si el rol es 'ADMIN', ahora verificamos si el usuario
+    // es miembro del workspace, sin importar su rol.
+    // Este es el mismo código que ya funciona en getLists.php
+    $stmt_perm = $conn->prepare("SELECT userId FROM workspace_members WHERE userId = ? AND workspaceId = ?");
+    $stmt_perm->bind_param("ss", $user_id, $workspaceId);
+    $stmt_perm->execute();
+    if ($stmt_perm->get_result()->num_rows === 0) {
         http_response_code(403);
-        die(json_encode(["message" => "Acceso denegado. Solo para administradores."]));
+        die(json_encode(["message" => "Acceso denegado. No eres miembro de este espacio."]));
     }
-    $stmt_role->close();
+    $stmt_perm->close();
+
+    // --- Lógica para obtener los campos (sin cambios) ---
+    $stmt = $conn->prepare("SELECT id, name, type FROM custom_fields WHERE workspaceId = ?");
+    $stmt->bind_param("s", $workspaceId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $fields = $result->fetch_all(MYSQLI_ASSOC);
+
+    http_response_code(200);
+    echo json_encode($fields);
 
 } catch (Exception $e) {
     http_response_code(401);
-    die(json_encode(["message" => "Token inválido.", "error" => $e->getMessage()]));
+    echo json_encode(["message" => "Token inválido.", "error" => $e->getMessage()]);
 }
 
-// Obtenemos el ID del workspace de la URL
-$workspaceId = $_GET['workspaceId'] ?? '';
-if (!$workspaceId) {
-    http_response_code(400); 
-    die(json_encode(["message" => "Se requiere workspaceId."]));
-}
-
-// Preparamos y ejecutamos la consulta para obtener los campos personalizados
-$stmt = $conn->prepare("SELECT id, name, type FROM custom_fields WHERE workspaceId = ? ORDER BY name ASC");
-if ($stmt === false) {
-    http_response_code(500);
-    die(json_encode(["message" => "Error al preparar la consulta.", "error" => $conn->error]));
-}
-
-$stmt->bind_param("s", $workspaceId);
-
-if (!$stmt->execute()) {
-    http_response_code(500);
-    die(json_encode(["message" => "Error al ejecutar la consulta.", "error" => $stmt->error]));
-}
-
-$result = $stmt->get_result();
-$fields = $result->fetch_all(MYSQLI_ASSOC);
-
-http_response_code(200);
-echo json_encode($fields);
-
-$stmt->close();
 $conn->close();
 ?>

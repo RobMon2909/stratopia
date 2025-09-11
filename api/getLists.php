@@ -40,12 +40,12 @@ try {
     
     // Verificación de permisos (sin cambios)
     $stmt_perm = $conn->prepare("SELECT userId FROM workspace_members WHERE userId = ? AND workspaceId = ?");
-    $stmt_perm->bind_param("ss", $user_id, $workspaceId);
-    $stmt_perm->execute();
-    if ($stmt_perm->get_result()->num_rows === 0) {
-        http_response_code(403); die(json_encode(["message" => "Acceso denegado."]));
-    }
-    $stmt_perm->close();
+$stmt_perm->bind_param("ss", $user_id, $workspaceId);
+$stmt_perm->execute();
+if ($stmt_perm->get_result()->num_rows === 0) {
+    http_response_code(403); die(json_encode(["message" => "Acceso denegado. No eres miembro de este espacio."]));
+}
+$stmt_perm->close();
 
     // Obtener listas (sin cambios)
     $stmt_lists = $conn->prepare("SELECT id, name FROM lists WHERE workspaceId = ? ORDER BY createdAt ASC");
