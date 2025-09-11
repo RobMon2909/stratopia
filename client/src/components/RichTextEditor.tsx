@@ -1,27 +1,24 @@
 // src/components/RichTextEditor.tsx
 
+import React from 'react';
 import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import React from 'react';
 
-// Barra de herramientas para el editor
-const MenuBar = ({ editor }: { editor: Editor | null }) => {
+const MenuBar: React.FC<{ editor: Editor | null }> = ({ editor }) => {
   if (!editor) {
     return null;
   }
-
   return (
-    <div className="border border-gray-300 rounded-t-md p-2 flex flex-wrap gap-2">
-      <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} disabled={!editor.can().chain().focus().toggleBold().run()} className={editor.isActive('bold') ? 'font-bold bg-gray-200 p-1 rounded' : 'p-1 rounded'}>B</button>
-      <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} disabled={!editor.can().chain().focus().toggleItalic().run()} className={editor.isActive('italic') ? 'italic bg-gray-200 p-1 rounded' : 'p-1 rounded'}>I</button>
-      <button type="button" onClick={() => editor.chain().focus().toggleStrike().run()} disabled={!editor.can().chain().focus().toggleStrike().run()} className={editor.isActive('strike') ? 'line-through bg-gray-200 p-1 rounded' : 'p-1 rounded'}>S</button>
-      <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className={editor.isActive('bulletList') ? 'bg-gray-200 p-1 rounded' : 'p-1 rounded'}>Lista</button>
-      <button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={editor.isActive('orderedList') ? 'bg-gray-200 p-1 rounded' : 'p-1 rounded'}>Lista Num.</button>
+    <div className="border border-b-0 border-gray-300 bg-gray-50 rounded-t-md p-2 flex flex-wrap gap-x-4 gap-y-1">
+      <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={editor.isActive('bold') ? 'font-bold' : ''}>Negrita</button>
+      <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={editor.isActive('italic') ? 'italic' : ''}>Cursiva</button>
+      <button type="button" onClick={() => editor.chain().focus().toggleStrike().run()} className={editor.isActive('strike') ? 'line-through' : ''}>Tachado</button>
+      <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className={editor.isActive('bulletList') ? 'font-bold' : ''}>Viñetas</button>
+      <button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={editor.isActive('orderedList') ? 'font-bold' : ''}>Lista Num.</button>
     </div>
   );
 };
 
-// Editor principal
 interface RichTextEditorProps {
   content: string;
   onChange: (newContent: string) => void;
@@ -34,7 +31,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, plac
     content: content,
     editorProps: {
       attributes: {
-        class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl m-5 focus:outline-none min-h-[100px]',
+        class: 'prose max-w-none p-3 min-h-[120px] focus:outline-none',
       },
     },
     onUpdate({ editor }) {

@@ -1,17 +1,8 @@
 import React from 'react';
-import type { Task, CustomField, FieldOption, NestedTask, User, Workspace } from '../types';
+import type { Task, CustomField, FieldOption, NestedTask } from '../types';
 import EditableCell from './EditableCell.tsx';
-import EditableSelect from './EditableSelect.tsx'; // <-- IMPORTAMOS EL NUEVO COMPONENTE
 import Avatar from './ui/Avatar.tsx';
 import Tag from './ui/Tag.tsx';
-
-// Un mapa para los colores e íconos de las prioridades
-const priorityStyles: { [key: string]: { color: string; icon: React.ReactElement } } = {
-    'Urgente': { color: '#EF4444', icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4"><path d="M3 3.75a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 .75.75v5.5a.75.75 0 0 1-1.5 0V4.5h-3v8.75a.75.75 0 0 1-1.5 0V4.5h-3v5.5a.75.75 0 0 1-1.5 0v-5.5Z" /></svg> },
-    'Alta':    { color: '#F97316', icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4"><path d="M3 3.75a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 .75.75v5.5a.75.75 0 0 1-1.5 0V4.5h-3v8.75a.75.75 0 0 1-1.5 0V4.5h-3v5.5a.75.75 0 0 1-1.5 0v-5.5Z" /></svg> },
-    'Normal':  { color: '#2563EB', icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4"><path d="M3 3.75a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 .75.75v5.5a.75.75 0 0 1-1.5 0V4.5h-3v8.75a.75.75 0 0 1-1.5 0V4.5h-3v5.5a.75.75 0 0 1-1.5 0v-5.5Z" /></svg> },
-    'Baja':    { color: '#8B5CF6', icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4"><path d="M3 3.75a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 .75.75v5.5a.75.75 0 0 1-1.5 0V4.5h-3v8.75a.75.75 0 0 1-1.5 0V4.5h-3v5.5a.75.75 0 0 1-1.5 0v-5.5Z" /></svg> },
-};
 
 interface TaskRowProps {
     task: NestedTask;
@@ -31,35 +22,55 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, customFields, fieldOptions, onO
         return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
     };
 
+    // --- FUNCIÓN DE RENDERIZADO CORREGIDA ---
     const renderCustomField = (field: CustomField) => {
         const valueData = task.customFields?.[field.id];
+        
+        // Si no hay datos para este campo en esta tarea, no mostramos nada.
         if (!valueData) return <span className="text-gray-400">-</span>;
 
         switch(field.type) {
+            case 'dropdown':
+                // Para dropdown, necesitamos un optionId
+                if (!valueData.optionId) return <span className="text-gray-400">-</span>;
+                const option = (fieldOptions[field.id] || []).find(opt => opt.id === valueData.optionId);
+                if (!option) return <span className="text-gray-400">-</span>;
+                return <Tag text={option.value} color={option.color} />;
+
+            case 'labels':
+                // Para labels, necesitamos el array optionIds
+                const selectedOptionIds = valueData.optionIds || [];
+                if (selectedOptionIds.length === 0) return <span className="text-gray-400">-</span>;
+                
+                const allOptions = fieldOptions[field.id] || [];
+                return (
+                    <div className="flex flex-wrap gap-1">
+                        {selectedOptionIds.map(id => {
+                            const option = allOptions.find(opt => opt.id === id);
+                            if (!option) return null;
+                            return <Tag key={id} text={option.value} color={option.color} />;
+                        })}
+                    </div>
+                );
+
             case 'text':
                 return <div className="max-w-[150px] truncate" title={valueData.value}>{valueData.value || <span className="text-gray-400">-</span>}</div>;
-            case 'dropdown':
-                const dropdownOption = (fieldOptions[field.id] || []).find(opt => opt.id === valueData.optionId);
-                if (!dropdownOption) return <span className="text-gray-400">-</span>;
-                return <Tag text={dropdownOption.value} color={dropdownOption.color} />;
-            case 'labels':
-                const selectedIds = valueData.optionIds || [];
-                const options = fieldOptions[field.id] || [];
-                if (selectedIds.length === 0) return <span className="text-gray-400">-</span>;
-                return (<div className="flex flex-wrap gap-1">{selectedIds.map(id => { const option = options.find(opt => opt.id === id); if (!option) return null; return (<Tag key={id} text={option.value} color={option.color} />);})}</div>);
+                
             default:
                 return <span className="text-gray-400">-</span>;
         }
     };
-
-    const priorityStyle = task.priority ? (priorityStyles[task.priority] || { color: '#6B7280', icon: priorityStyles['Normal'].icon }) : null;
+    
+    // --- CORRECCIÓN EN EL FILTRADO DE CAMPOS A MOSTRAR ---
+    const priorityField = customFields.find(f => f.name.toLowerCase() === 'prioridad');
+    // Ahora filtramos de la misma forma que en TaskGrid para mantener la consistencia
+    const otherCustomFields = customFields.filter(f => f.name.toLowerCase() !== 'prioridad');
 
     return (
         <>
             <tr className="bg-white border-b hover:bg-gray-50 group">
                 <td className="px-6 py-2 font-medium text-gray-900 whitespace-nowrap">
-                    <div style={{ paddingLeft: `${level * 24}px` }} className="flex items-center">
-                        {/* --- NUEVO: ICONOS DE DEPENDENCIAS --- */}
+                    <div className="flex items-center gap-2">
                         {task.waitingFor && task.waitingFor.length > 0 && 
                             <div title={`Esperando a: ${task.waitingFor.map(t => t.title).join(', ')}`}>
                                 <svg className="w-4 h-4 text-orange-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"></path></svg>
@@ -81,10 +92,9 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, customFields, fieldOptions, onO
                     </div>
                 </td>
                 <td className="px-6 py-2">
-                    {/* --- CAMBIO CLAVE: Usamos el componente Tag para Prioridad --- */}
-                    {priorityStyle && <Tag text={task.priority} color={priorityStyle.color} icon={priorityStyle.icon} />}
+                    {priorityField ? renderCustomField(priorityField) : <span className="text-gray-400">-</span>}
                 </td>
-                {customFields.map(field => (<td key={field.id} className="px-6 py-2">{renderCustomField(field)}</td>))}
+                {otherCustomFields.map(field => (<td key={field.id} className="px-6 py-2">{renderCustomField(field)}</td>))}
                 <td className="px-4 py-2 opacity-0 group-hover:opacity-100 transition-opacity text-center">
                     <button onClick={() => onOpenTask(task, task.listId)} className="font-medium text-blue-600 hover:underline text-xs" title="Abrir detalles">Abrir</button>
                     <button onClick={() => onOpenTask(null, task.listId, task.id)} className="ml-2 font-bold text-blue-600 hover:underline text-lg" title="Añadir Subtarea">+</button>

@@ -5,6 +5,7 @@ import {
     getFieldOptions, updateTask, getWorkspaceMembers, searchTasks, 
     getNotifications, markNotificationsAsRead 
 } from '../services/api';
+import socketService from '../services/socketService';
 import NotificationsPanel from '../components/NotificationsPanel.tsx';
 import type { Notification } from '../components/NotificationsPanel.tsx';
 import { useAuth } from '../hooks/useAuth.ts';
@@ -14,9 +15,6 @@ import TaskGrid from '../components/TaskGrid.tsx';
 import BoardView from '../components/BoardView.tsx';
 import CalendarView from '../components/CalendarView.tsx';
 import { useDebounce } from '../hooks/useDebounce.ts';
-import socketService from '../services/socketService'; // <-- IMPORTAR EL SERVICIO
-
-
 
 type ViewType = 'list' | 'board' | 'calendar';
 type GroupByOption = 'default' | 'priority' | 'dueDate' | 'assignee' | 'status';
@@ -44,11 +42,17 @@ const DashboardPage: React.FC = () => {
     const [searchResults, setSearchResults] = useState<Task[] | null>(null);
     const [isSearching, setIsSearching] = useState(false);
     const debouncedSearchTerm = useDebounce(searchTerm, 500);
-    
-    // Estados para notificaciones y agrupación
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     const [groupBy, setGroupBy] = useState<GroupByOption>('default');
+    const [hideDoneTasks, setHideDoneTasks] = useState<boolean>(() => {
+        const savedPreference = localStorage.getItem('hideDoneTasks');
+        return savedPreference === 'true'; 
+    });
+
+    useEffect(() => {
+        localStorage.setItem('hideDoneTasks', String(hideDoneTasks));
+    }, [hideDoneTasks]);
 
     const allTasks = useMemo(() => lists.reduce((acc, list) => [...acc, ...list.tasks], [] as Task[]), [lists]);
 
@@ -77,25 +81,6 @@ const DashboardPage: React.FC = () => {
         } catch (error) { console.error("Failed to fetch workspace data", error); } 
         finally { setLoadingData(false); }
     }, [activeWorkspace, groupBy]);
-// --- CONECTAR Y ESCUCHAR AL WEBSOCKET ---
-    useEffect(() => {
-        // Conectamos cuando el componente se monta
-        socketService.connect();
-
-        // Empezamos a escuchar el evento 'task_updated'
-        socketService.on('task_updated', (data) => {
-            console.log('Received task update for task ID:', data.taskId);
-            // Cuando recibimos una actualización, simplemente volvemos a pedir todos los datos.
-            // Es la forma más simple y robusta de asegurar que la UI esté sincronizada.
-            fetchDataForWorkspace();
-        });
-
-        // Nos desconectamos cuando el componente se desmonta para limpiar
-        return () => {
-            socketService.disconnect();
-        };
-    }, [fetchDataForWorkspace]); // fetchDataForWorkspace debe estar envuelta en useCallback
-
 
     useEffect(() => {
         if (user) {
@@ -126,24 +111,46 @@ const DashboardPage: React.FC = () => {
     }, [debouncedSearchTerm, activeWorkspace]);
 
     useEffect(() => {
-        const fetchNotifications = () => {
-            getNotifications()
-                .then(res => setNotifications(res.data))
-                .catch(err => console.error("Error fetching notifications:", err));
-        };
+        const fetchNotifications = () => { getNotifications().then(res => setNotifications(res.data)).catch(err => console.error("Error fetching notifications:", err)); };
         fetchNotifications();
         const interval = setInterval(fetchNotifications, 30000);
         return () => clearInterval(interval);
     }, []);
+
+    useEffect(() => {
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!user) return;
+        socketService.connect();
+        socketService.on('task_updated', (data) => {
+            if (data.updatedBy !== user.id) {
+                fetchDataForWorkspace();
+            }
+        });
+        socketService.on('user_assigned_to_task', (data) => {
+            if (data.assignedUserId === user.id) {
+                if (Notification.permission === 'granted') {
+                    const notification = new Notification('Nueva Tarea Asignada', {
+                        body: `${data.actorName} te asignó la tarea: "${data.taskTitle}"`,
+                    });
+                }
+            }
+        });
+        return () => {
+            socketService.disconnect();
+        };
+    }, [fetchDataForWorkspace, user]);
     
     const unreadCount = useMemo(() => notifications.filter(n => !n.isRead).length, [notifications]);
 
     const handleToggleNotifications = () => {
         setIsNotificationsOpen(prev => !prev);
         if (unreadCount > 0 && !isNotificationsOpen) {
-            markNotificationsAsRead()
-                .then(() => setNotifications(prev => prev.map(n => ({ ...n, isRead: 1 }))))
-                .catch(err => console.error("Failed to mark notifications as read", err));
+            markNotificationsAsRead().then(() => setNotifications(prev => prev.map(n => ({ ...n, isRead: 1 })))).catch(err => console.error("Failed to mark notifications as read", err));
         }
     };
     
@@ -169,28 +176,32 @@ const DashboardPage: React.FC = () => {
         setIsTaskModalOpen(true);
     };
 
+    const handleNotificationClick = (taskId: string) => {
+        const taskToOpen = allTasks.find(task => task.id === taskId);
+        if (taskToOpen) {
+            handleOpenTaskModal(taskToOpen, taskToOpen.listId);
+            setIsNotificationsOpen(false);
+        } else {
+            alert("La tarea no se encontró en el espacio de trabajo actual.");
+        }
+    };
+
     const handleCloseTaskModal = () => {
         setIsTaskModalOpen(false); setSelectedTask(null); setListIdForNewTask(null); setParentIdForNewTask(undefined);
     };
     
     const handleDataNeedsRefresh = () => { fetchDataForWorkspace(); };
     
-    const handleTaskUpdated = (updatedTask: any) => {
-        // Esta función ahora solo refresca los datos. 
-        // El guardado real se hace en el modal o en la vista de tablero.
-        fetchDataForWorkspace();
-    };
+    const handleTaskUpdated = (updatedTask: any) => { fetchDataForWorkspace(); };
     
-    const handleFilterChange = (filterName: string, value: string) => {
-        setActiveFilters(prev => ({ ...prev, [filterName]: value }));
-    };
+    const handleFilterChange = (filterName: string, value: string) => { setActiveFilters(prev => ({ ...prev, [filterName]: value })); };
 
     const tasksToDisplay = searchResults !== null ? searchResults : allTasks;
     const statusField = useMemo(() => customFields.find(f => f.name.toLowerCase() === 'estado'), [customFields]);
-    const statusOptions = useMemo(() => (statusField ? fieldOptions[statusField.id] || [] : []), [statusField, fieldOptions]);
+    const statusOptions = useMemo(() => (statusField ? [...(fieldOptions[statusField.id] || [])].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)) : []), [statusField, fieldOptions]);
     
     const filteredTasks = useMemo(() => {
-        return tasksToDisplay.filter(task => {
+        let tasksToProcess = tasksToDisplay.filter(task => {
             if (activeFilters.assigneeId !== 'all' && !(task.assignees || []).find(a => a.id === activeFilters.assigneeId)) return false;
             if (activeFilters.statusId !== 'all' && statusField) {
                 const taskStatusValue = task.customFields?.[statusField.id];
@@ -206,14 +217,24 @@ const DashboardPage: React.FC = () => {
             }
             return true;
         });
-    }, [tasksToDisplay, activeFilters, statusField]);
+
+        if (hideDoneTasks && statusField && statusOptions.length > 0) {
+            const doneStatusId = statusOptions[statusOptions.length - 1].id;
+            tasksToProcess = tasksToProcess.filter(task => {
+                const taskStatusId = task.customFields?.[statusField.id]?.optionId;
+                return taskStatusId !== doneStatusId;
+            });
+        }
+        
+        return tasksToProcess;
+    }, [tasksToDisplay, activeFilters, statusField, statusOptions, hideDoneTasks]);
 
     const renderCurrentView = () => {
         switch(currentView) {
             case 'board':
                 return <BoardView tasks={filteredTasks} statusField={statusField} statusOptions={statusOptions} customFields={customFields} onOpenTask={handleOpenTaskModal} onDataNeedsRefresh={handleDataNeedsRefresh} />;
             case 'calendar':
-    return <CalendarView tasks={filteredTasks} onOpenTask={handleOpenTaskModal} onDataNeedsRefresh={handleDataNeedsRefresh} />;
+                return <CalendarView tasks={filteredTasks} onOpenTask={handleOpenTaskModal} onDataNeedsRefresh={handleDataNeedsRefresh} />;
             case 'list':
             default:
                 return <TaskGrid tasks={filteredTasks} customFields={customFields} fieldOptions={fieldOptions} onOpenTask={handleOpenTaskModal} onTaskUpdate={handleTaskUpdated} groupBy={groupBy} allUsers={workspaceMembers} statusOptions={statusOptions} statusField={statusField} />;
@@ -239,7 +260,6 @@ const DashboardPage: React.FC = () => {
                     </div>
                 </div>
             )}
-
             <aside className="w-64 bg-gray-50 p-5 border-r flex flex-col flex-shrink-0">
                 <h1 className="text-2xl font-bold text-blue-600 mb-6">Stratopia</h1>
                 <div className="flex justify-between items-center mb-2">
@@ -256,7 +276,6 @@ const DashboardPage: React.FC = () => {
                     <button onClick={logout} className="text-sm text-red-500 hover:underline">Logout</button>
                  </div>
             </aside>
-            
             <main className="flex-1 p-6 lg:p-8 flex flex-col overflow-y-hidden">
                 {activeWorkspace ? (
                     <>
@@ -267,24 +286,20 @@ const DashboardPage: React.FC = () => {
                             </div>
                             <div className="flex items-center gap-4">
                                 <input type="text" placeholder="Buscar tareas..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="p-2 border rounded-md" />
-                                <div><label htmlFor="groupBy-select" className="text-xs font-semibold text-gray-500">AGRUPAR POR</label><select id="groupBy-select" value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupByOption)} className="ml-2 p-1 border-gray-300 rounded-md text-sm bg-white"><option value="default">Por defecto</option><option value="priority">Prioridad</option><option value="dueDate">Fecha Límite</option><option value="assignee">Asignado</option><option value="status">Estado</option></select></div>
+                                <div><label htmlFor="groupBy-select" className="text-xs font-semibold text-gray-500">AGRUPAR</label><select id="groupBy-select" value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupByOption)} className="ml-2 p-1 border-gray-300 rounded-md text-sm bg-white"><option value="default">Por defecto</option><option value="priority">Prioridad</option><option value="dueDate">Fecha Límite</option><option value="assignee">Asignado</option><option value="status">Estado</option></select></div>
+                                
                                 {statusField && (<div><label htmlFor="status-filter" className="text-xs font-semibold text-gray-500">ESTADO</label><select id="status-filter" value={activeFilters.statusId} onChange={(e) => handleFilterChange('statusId', e.target.value)} className="ml-2 p-1 border-gray-300 rounded-md text-sm bg-white"><option value="all">Todos</option>{statusOptions.map(option => (<option key={option.id} value={option.id}>{option.value}</option>))}</select></div>)}
                                 <div><label htmlFor="assignee-filter" className="text-xs font-semibold text-gray-500">ASIGNADO</label><select id="assignee-filter" value={activeFilters.assigneeId} onChange={(e) => handleFilterChange('assigneeId', e.target.value)} className="ml-2 p-1 border-gray-300 rounded-md text-sm bg-white"><option value="all">Todos</option>{workspaceMembers.map(member => (<option key={member.id} value={member.id}>{member.name}</option>))}</select></div>
-                                {/* --- BOTÓN "AÑADIR TAREA" RE-AÑADIDO --- */}
-                                <button 
-                                    onClick={() => handleOpenTaskModal(null, lists[0]?.id)} 
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow font-semibold hover:bg-blue-700 disabled:bg-blue-300" 
-                                    disabled={lists.length === 0}
-                                    title={lists.length === 0 ? "Crea una lista primero" : "Añadir nueva tarea"}
-                                >
-                                    + Añadir Tarea
-                                </button>
+                                
+                                <div className="flex items-center"><input type="checkbox" id="hide-done" checked={hideDoneTasks} onChange={e => setHideDoneTasks(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/><label htmlFor="hide-done" className="ml-2 block text-sm text-gray-900">Ocultar Finalizadas</label></div>
+                                <button onClick={() => handleOpenTaskModal(null, lists[0]?.id)} className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow font-semibold hover:bg-blue-700 disabled:bg-blue-300" disabled={lists.length === 0} title={lists.length === 0 ? "Crea una lista primero" : "Añadir nueva tarea"}>+ Añadir Tarea</button>
                                 <div className="relative">
                                     <button onClick={handleToggleNotifications} className="relative p-2 rounded-full hover:bg-gray-100">
-                                        <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 00-5-5.917V5a1 1 0 10-2 0v.083A6 6 0 006 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                                        {/* --- CÓDIGO DEL ÍCONO CORREGIDO --- */}
+                                        <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 00-5-5.917V5a1 1 0 10-2 0v.083A6 6 0 006 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
                                         {unreadCount > 0 && (<span className="absolute top-1 right-1 block h-3 w-3 rounded-full bg-red-500 border-2 border-white"></span>)}
                                     </button>
-                                    {isNotificationsOpen && (<NotificationsPanel notifications={notifications} onClose={() => setIsNotificationsOpen(false)} />)}
+                                    {isNotificationsOpen && (<NotificationsPanel notifications={notifications} onClose={() => setIsNotificationsOpen(false)} onNotificationClick={handleNotificationClick} />)}
                                 </div>
                             </div>
                         </div>
