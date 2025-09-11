@@ -90,8 +90,8 @@ foreach ($users as $user) {
         $mail->isSMTP();
         $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
-    $mail->Username   = 'auxiliar.stratopia@gmail.com'; // TU CORREO DE GMAIL
-    $mail->Password   = 'epmt tqxu aduj uzuk';      // TU CONTRASEÑA DE APLICACIÓN DE 16 LETRAS (sin espacios)
+    $mail->Username   = 'correo'; // TU CORREO DE GMAIL
+    $mail->Password   = 'contraseña';      // TU CONTRASEÑA DE APLICACIÓN DE 16 LETRAS (sin espacios)
     $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
     $mail->Port       = 465;
 
