@@ -96,7 +96,7 @@ foreach ($users as $user) {
     $mail->Port       = 465;
 
     // Remitente y Destinatario
-    $mail->setFrom('auxiliar.stratopia@gmail.com', 'Notificaciones Stratopia');
+    $mail->setFrom('correo', 'Notificaciones Stratopia');
     $mail->addAddress($user['email'], $user['name']);
 
         // Contenido
