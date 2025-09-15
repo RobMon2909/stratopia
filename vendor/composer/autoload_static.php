@@ -4,7 +4,7 @@
 
 namespace Composer\Autoload;
 
-class ComposerStaticInit3e24601f66164562344a064cf5bd23a2
+class ComposerStaticInit2e2ebf64ce1d31ca755b6193fceaee63
 {
     public static $files = array (
         'ad155f8f1cf0d418fe49e248db8c661b' => __DIR__ . '/..' . '/react/promise/src/functions_include.php',
@@ -15,6 +15,10 @@ class ComposerStaticInit3e24601f66164562344a064cf5bd23a2
     );
 
     public static $prefixLengthsPsr4 = array (
+        'W' => 
+        array (
+            'WebSocket\\' => 10,
+        ),
         'S' => 
         array (
             'Symfony\\Polyfill\\Php83\\' => 23,
@@ -36,7 +40,10 @@ class ComposerStaticInit3e24601f66164562344a064cf5bd23a2
         ),
         'P' => 
         array (
+            'Psr\\Log\\' => 8,
             'Psr\\Http\\Message\\' => 17,
+            'Phrity\\Util\\' => 12,
+            'Phrity\\Net\\' => 11,
             'PHPMailer\\PHPMailer\\' => 20,
         ),
         'G' => 
@@ -54,6 +61,10 @@ class ComposerStaticInit3e24601f66164562344a064cf5bd23a2
     );
 
     public static $prefixDirsPsr4 = array (
+        'WebSocket\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/textalk/websocket/lib',
+        ),
         'Symfony\\Polyfill\\Php83\\' => 
         array (
             0 => __DIR__ . '/..' . '/symfony/polyfill-php83',
@@ -106,10 +117,22 @@ class ComposerStaticInit3e24601f66164562344a064cf5bd23a2
         array (
             0 => __DIR__ . '/..' . '/cboden/ratchet/src/Ratchet',
         ),
+        'Psr\\Log\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/psr/log/src',
+        ),
         'Psr\\Http\\Message\\' => 
         array (
             0 => __DIR__ . '/..' . '/psr/http-factory/src',
             1 => __DIR__ . '/..' . '/psr/http-message/src',
+        ),
+        'Phrity\\Util\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/phrity/util-errorhandler/src',
+        ),
+        'Phrity\\Net\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/phrity/net-uri/src',
         ),
         'PHPMailer\\PHPMailer\\' => 
         array (
@@ -147,9 +170,9 @@ class ComposerStaticInit3e24601f66164562344a064cf5bd23a2
     public static function getInitializer(ClassLoader $loader)
     {
         return \Closure::bind(function () use ($loader) {
-            $loader->prefixLengthsPsr4 = ComposerStaticInit3e24601f66164562344a064cf5bd23a2::$prefixLengthsPsr4;
-            $loader->prefixDirsPsr4 = ComposerStaticInit3e24601f66164562344a064cf5bd23a2::$prefixDirsPsr4;
-            $loader->classMap = ComposerStaticInit3e24601f66164562344a064cf5bd23a2::$classMap;
+            $loader->prefixLengthsPsr4 = ComposerStaticInit2e2ebf64ce1d31ca755b6193fceaee63::$prefixLengthsPsr4;
+            $loader->prefixDirsPsr4 = ComposerStaticInit2e2ebf64ce1d31ca755b6193fceaee63::$prefixDirsPsr4;
+            $loader->classMap = ComposerStaticInit2e2ebf64ce1d31ca755b6193fceaee63::$classMap;
 
         }, null, ClassLoader::class);
     }

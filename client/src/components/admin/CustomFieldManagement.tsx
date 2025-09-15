@@ -183,7 +183,8 @@ const CustomFieldManagement: React.FC = () => {
         items.splice(result.destination.index, 0, reorderedItem);
         setCurrentOptions(items);
         const optionIdsInNewOrder = items.map(item => item.id);
-        updateFieldOptionsOrder(optionIdsInNewOrder).catch(err => {
+        updateFieldOptionsOrder(optionIdsInNewOrder).catch(_ => {
+    alert('Error al eliminar el campo.');
             alert("No se pudo guardar el nuevo orden.");
         });
     };

@@ -1,40 +1,35 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+// client/src/App.tsx
+
+import { Routes, Route, Navigate } from 'react-router-dom'; // Se quita BrowserRouter de aquí
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import AdminPage from './pages/AdminPage.tsx'; 
-import PrivateRoute from './components/PrivateRoute'; // Importamos los protectores de ruta
+import PrivateRoute from './components/PrivateRoute';
 import AdminRoute from './components/AdminRoute';
+// NOTA: AuthProvider ya no se importa ni se usa aquí, se usa en main.tsx
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <Routes>
-          {/* Rutas Públicas */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+    // El AuthProvider fue movido a main.tsx para envolver toda la app
+    <Routes>
+      {/* Rutas Públicas */}
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      
+      {/* Grupo de rutas para usuarios logueados */}
+      <Route element={<PrivateRoute />}>
+        <Route path="/" element={<DashboardPage />} />
+      </Route>
 
-          {/* --- NUEVA ESTRUCTURA DE RUTAS PROTEGIDAS --- */}
-          
-          {/* Grupo de rutas para usuarios logueados */}
-          <Route element={<PrivateRoute />}>
-            <Route path="/" element={<DashboardPage />} />
-            {/* Aquí podrías añadir más rutas privadas normales, ej: /profile */}
-          </Route>
+      {/* Grupo de rutas SOLO para Admins */}
+      <Route element={<AdminRoute />}>
+        <Route path="/admin" element={<AdminPage />} />
+      </Route>
 
-          {/* Grupo de rutas SOLO para Admins */}
-          <Route element={<AdminRoute />}>
-            <Route path="/admin" element={<AdminPage />} />
-            {/* Aquí podrías añadir más rutas de admin, ej: /admin/settings */}
-          </Route>
-
-          {/* Redirigir cualquier otra ruta desconocida */}
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </Router>
-    </AuthProvider>
+      {/* Redirigir cualquier otra ruta desconocida */}
+      <Route path="*" element={<Navigate to="/" />} />
+    </Routes>
   );
 }
 

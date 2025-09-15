@@ -15,7 +15,7 @@ interface BoardViewProps {
     onDataNeedsRefresh: () => void;
 }
 
-const BoardView: React.FC<BoardViewProps> = ({ tasks, statusField, statusOptions, customFields, onOpenTask, onDataNeedsRefresh }) => {
+const BoardView: React.FC<BoardViewProps> = ({ tasks, statusField, statusOptions, onOpenTask, onDataNeedsRefresh }) => {
     type ColumnMap = { [key: string]: { name: string; color: string; items: Task[] } };
     const [columns, setColumns] = useState<ColumnMap>({});
 
@@ -150,50 +150,43 @@ const BoardView: React.FC<BoardViewProps> = ({ tasks, statusField, statusOptions
     };
 
     if (!statusField) {
-        return <div className="p-8 text-center text-gray-500 bg-gray-50 rounded-lg">Para usar la vista de tablero, crea un campo personalizado de tipo **dropdown** o **labels** llamado **"Estado"**.</div>;
+        return <div className="p-8 text-center text-foreground-secondary bg-background-primary rounded-lg">Para usar la vista de tablero, crea un campo personalizado de tipo **dropdown** o **labels** llamado **"Estado"**.</div>;
     }
 
     return (
         <div className="flex gap-4 overflow-x-auto p-2 h-full">
-            <DragDropContext onDragEnd={onDragEnd}>
-                {Object.entries(columns).map(([columnId, column]) => (
-                    <div key={columnId} className="w-72 bg-gray-100 rounded-lg flex flex-col flex-shrink-0 h-full">
-                        <div className="p-3 font-semibold text-sm border-b-2" style={{ borderBottomColor: column.color }}>
+        <DragDropContext onDragEnd={onDragEnd}>
+            {Object.entries(columns).map(([columnId, column]) => (
+                    <div key={columnId} className="w-72 bg-background-secondary rounded-lg flex flex-col flex-shrink-0 h-full">
+                    <div className="p-3 font-semibold text-sm border-b-2" style={{ borderBottomColor: column.color }}>
                             <span className="px-2 py-1 rounded text-xs font-bold" style={{ backgroundColor: column.color + '30', color: column.color }}>{column.name}</span>
                             <span className="ml-2 text-gray-500">{column.items.length}</span>
                         </div>
-                        <Droppable 
-                            droppableId={columnId} 
-                            isDropDisabled={columnId === 'unassigned'} // <-- ESTA LÍNEA ES LA MAGIA
-                        >
-                            {(provided, snapshot) => (
-                                <div 
-                                    {...provided.droppableProps} 
-                                    ref={provided.innerRef} 
-                                    // Añadimos un estilo visual para indicar que no se puede soltar
-                                    className={`p-3 flex-grow min-h-[100px] rounded-b-lg transition-colors duration-300 
-                                    ${snapshot.isDraggingOver ? 'bg-blue-100' : ''}
-                                    ${columnId === 'unassigned' ? 'opacity-70' : ''}
-                                    `}
-                                >
-                                    {column.items.map((item, index) => (
-                                        <Draggable key={item.id} draggableId={item.id} index={index}>
-                                            {(provided) => (
-                                                <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} className="mb-2">
-                                                    <TaskCard task={item} onClick={() => onOpenTask(item, item.listId)} />
-                                                </div>
-                                            )}
-                                        </Draggable>
-                                    ))}
-                                    {provided.placeholder}
-                                </div>
-                            )}
-                        </Droppable>
-                    </div>
-                ))}
-            </DragDropContext>
-        </div>
-    );
+                         <Droppable droppableId={columnId}>
+                        {(provided, snapshot) => (
+                            <div 
+                                {...provided.droppableProps} 
+                                ref={provided.innerRef} 
+                                className={`p-3 flex-grow min-h-[100px] rounded-b-lg transition-colors duration-300 ${snapshot.isDraggingOver ? 'bg-blue-100' : ''}`}
+                            >
+                                {column.items.map((item, index) => (
+                                    <Draggable key={item.id} draggableId={item.id} index={index}>
+                                        {(provided) => (
+                                            <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} className="mb-2">
+                                                <TaskCard task={item} onClick={() => onOpenTask(item, item.listId)} />
+                                            </div>
+                                        )}
+                                    </Draggable>
+                                ))}
+                                {provided.placeholder}
+                            </div>
+                        )}
+                    </Droppable>
+                </div>
+            ))}
+        </DragDropContext>
+    </div>
+);
 };
 
 export default BoardView;

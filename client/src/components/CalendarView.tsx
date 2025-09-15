@@ -53,7 +53,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onOpenTask, onDataNe
     };
 
     return (
-        <div className="p-4 bg-white rounded-lg shadow-md h-full">
+        <div className="p-4 bg-card rounded-lg shadow-md h-full">
             <FullCalendar
                 plugins={[dayGridPlugin, interactionPlugin]}
                 initialView="dayGridMonth"

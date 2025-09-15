@@ -3,7 +3,7 @@ import { createTask, updateTask, getAttachments, uploadAttachment, deleteAttachm
 import type { Task, CustomField, User, FieldOption } from '../types';
 import RichTextEditor from './RichTextEditor';
 import TaskDependencies from './TaskDependencies';
-import { useEditor, EditorContent, ReactRenderer, Editor } from '@tiptap/react';
+import { useEditor, EditorContent, ReactRenderer } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Mention from '@tiptap/extension-mention';
 import tippy, { Instance as TippyInstance, GetReferenceClientRect } from 'tippy.js';
@@ -29,12 +29,11 @@ const MultiSelectDropdown: React.FC<{ options: FieldOption[]; selectedIds: strin
         const newSelectedIds = selectedIds.includes(optionId) ? selectedIds.filter(id => id !== optionId) : [...selectedIds, optionId];
         onChange(newSelectedIds);
     };
-    const selectedOptions = options.filter(opt => selectedIds.includes(opt.id));
-    return ( <div className="relative" ref={dropdownRef}> <div onClick={() => setIsOpen(!isOpen)} className="w-full p-2 border rounded bg-white cursor-pointer min-h-[42px] flex flex-wrap gap-1 items-center"> {selectedOptions.length > 0 ? selectedOptions.map(opt => ( <span key={opt.id} style={{ backgroundColor: opt.color + '30', color: opt.color }} className="px-2 py-1 text-xs font-bold rounded"> {opt.value} </span> )) : <span className="text-gray-400">-- Sin seleccionar --</span>} </div> {isOpen && ( <div className="absolute z-10 w-full mt-1 bg-white border rounded shadow-lg max-h-60 overflow-y-auto"> {options.map(opt => ( <div key={opt.id} onClick={() => handleSelect(opt.id)} className="p-2 hover:bg-gray-100 cursor-pointer flex items-center"> <input type="checkbox" readOnly checked={selectedIds.includes(opt.id)} className="mr-3 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/> <span style={{ backgroundColor: opt.color + '30', color: opt.color }} className="px-2 py-1 text-xs font-bold rounded"> {opt.value} </span> </div> ))} </div> )} </div> );
+    const selectedOptions = Array.isArray(options) ? options.filter(opt => selectedIds.includes(opt.id)) : [];
+    return ( <div className="relative" ref={dropdownRef}> <div onClick={() => setIsOpen(!isOpen)} className="w-full p-2 border border-border rounded bg-input cursor-pointer min-h-[42px] flex flex-wrap gap-1 items-center"> {selectedOptions.length > 0 ? selectedOptions.map(opt => ( <span key={opt.id} style={{ backgroundColor: opt.color + '30', color: opt.color }} className="px-2 py-1 text-xs font-bold rounded"> {opt.value} </span> )) : <span className="text-foreground-secondary">-- Sin seleccionar --</span>} </div> {isOpen && ( <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded shadow-lg max-h-60 overflow-y-auto"> {options.map(opt => ( <div key={opt.id} onClick={() => handleSelect(opt.id)} className="p-2 hover:bg-background-secondary cursor-pointer flex items-center"> <input type="checkbox" readOnly checked={selectedIds.includes(opt.id)} className="mr-3 h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"/> <span style={{ backgroundColor: opt.color + '30', color: opt.color }} className="px-2 py-1 text-xs font-bold rounded"> {opt.value} </span> </div> ))} </div> )} </div> );
 };
 
 const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEdit, onTaskCreated, onDataNeedsRefresh, customFields, parentId, workspaceMembers, allWorkspaceTasks }) => {
-    
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [dueDate, setDueDate] = useState('');
@@ -141,9 +140,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
     
     const handlePostComment = async (commentContent: string) => {
         const isCommentEmpty = !commentContent || commentContent.trim() === '' || commentContent.trim() === '<p></p>';
-        if (!taskToEdit || isCommentEmpty) {
-            return;
-        }
+        if (!taskToEdit || isCommentEmpty) { return; }
         try {
             const res = await createComment({ taskId: taskToEdit.id, content: commentContent });
             setComments(prev => [...prev, res.data.comment]);
@@ -156,49 +153,53 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4" onClick={onClose}>
-            <div className="bg-white rounded-lg shadow-2xl w-full max-w-4xl flex flex-col h-[90vh]" onClick={e => e.stopPropagation()}>
-                <form onSubmit={handleSubmit} className="flex flex-col h-full">
-                    <div className="p-4 border-b flex justify-between items-center flex-shrink-0">
-                        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Nombre de la tarea" className="w-full text-2xl font-bold outline-none" autoFocus />
-                        <button type="button" onClick={onClose} className="text-2xl text-gray-500 hover:text-gray-800 ml-4">&times;</button>
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" onClick={onClose}>
+            {/* El 'bg-card' le da el fondo sólido */}
+            <div className="bg-card text-card-foreground rounded-lg shadow-2xl w-full max-w-4xl flex flex-col h-[90vh]" onClick={e => e.stopPropagation()}>
+            <form onSubmit={handleSubmit} className="flex flex-col h-full">
+                <div className="p-4 border-b border-border flex justify-between items-center flex-shrink-0">
+                    <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Nombre de la tarea" className="w-full text-2xl font-bold outline-none bg-transparent text-foreground" autoFocus />
+                        <button type="button" onClick={onClose} className="text-2xl text-foreground-secondary hover:text-foreground-primary ml-4">&times;</button>
                     </div>
-                    
                     <div className="p-6 flex-grow overflow-y-auto space-y-6">
-                        <label className="block text-sm font-medium text-gray-700">Descripción</label>
+                        <label className="block text-sm font-medium text-foreground-secondary ">Descripción</label>
                         <RichTextEditor content={description} onChange={setDescription} placeholder="Añade una descripción..." />
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div> <label className="block text-sm font-medium text-gray-700">Fecha Límite</label> <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="mt-1 p-2 border rounded w-full" /> </div>
-                            <div> <label className="block text-sm font-medium text-gray-700">Personas Asignadas</label> <MultiSelectDropdown options={workspaceMembers.map(m => ({ id: m.id, value: m.name, color: '#e5e7eb' }))} selectedIds={assigneeIds} onChange={setAssigneeIds} /> </div>
+                            <div> 
+                                <label className="block text-sm font-medium text-foreground-secondary">Fecha Límite</label> 
+                                {/* Añadimos 'rounded-md' a los inputs */}
+                                <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="mt-1 p-2 border border-border rounded-md w-full bg-input text-foreground" /> 
+                            </div>
+                            <div> 
+                                <label className="block text-sm font-medium text-foreground-secondary">Personas Asignadas</label> 
+                                <MultiSelectDropdown options={workspaceMembers.map(m => ({ id: m.id, value: m.name, color: '#e5e7eb' }))} selectedIds={assigneeIds} onChange={setAssigneeIds} /> 
+                            </div>
                         </div>
                         
-                        {/* --- LÓGICA DE CAMPOS PERSONALIZADOS (AHORA INCLUYE PRIORIDAD) --- */}
-                {customFields.map(field => {
-                    const currentValue = customFieldValues[field.id] || {};
-                    if (field.type === 'text') { return (<div key={field.id}> {/* ... */} </div>); }
-                    if (field.type === 'dropdown') {
-                        return (
-                            <div key={field.id}>
-                                <label className="block text-sm font-medium text-gray-700">{field.name}</label>
-                                <select 
-                                    value={currentValue.optionId || ''} 
-                                    onChange={(e) => handleCustomFieldChange(field.id, e.target.options[e.target.selectedIndex].text, e.target.value)} 
-                                    className="mt-1 p-2 border rounded w-full bg-white"
-                                >
-                                    {(fieldOptions[field.id] || []).map(opt => (
-                                        <option key={opt.id} value={opt.id}>{opt.value}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        );
-                    }
-                    if (field.type === 'labels') {
+                        {customFields.map(field => {
+                            const currentValue = customFieldValues[field.id] || {};
+                            if (field.type === 'dropdown') {
                                 return (
                                     <div key={field.id}>
-                                        <label className="block text-sm font-medium text-gray-700">{field.name}</label>
-                                        {/* --- CORRECCIÓN CLAVE PARA ETIQUETAS --- */}
-                                        {/* Nos aseguramos de pasar un array a selectedIds */}
+                                        <label className="block text-sm font-medium text-foreground-secondary">{field.name}</label>
+                                        <select 
+                                            value={currentValue.optionId || ''} 
+                                            onChange={(e) => handleCustomFieldChange(field.id, e.target.options[e.target.selectedIndex].text, e.target.value)} 
+                                            className="mt-1 p-2 border border-border rounded-md w-full bg-input text-foreground"
+                                        >
+                                            <option value="">-- Sin seleccionar --</option>
+                                            {(fieldOptions[field.id] || []).map(opt => (
+                                                <option key={opt.id} value={opt.id}>{opt.value}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                );                            
+                            }
+                            if (field.type === 'labels') {
+                                return (
+                                    <div key={field.id}>
+                                        <label className="block text-sm font-medium text-foreground-secondary">{field.name}</label>
                                         <MultiSelectDropdown 
                                             options={fieldOptions[field.id] || []} 
                                             selectedIds={currentValue.optionIds || []} 
@@ -211,10 +212,10 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
                         })}
                         
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Archivos Adjuntos</label>
+                            <label className="block text-sm font-medium text-foreground-secondary">Archivos Adjuntos</label>
                             <div className="mt-2 space-y-2">
-                                {attachments.map(att => (
-                                    <div key={att.id} className="flex justify-between items-center bg-gray-100 p-2 rounded">
+                                {Array.isArray(attachments) && attachments.map(att => (
+                                    <div key={att.id} className="flex justify-between items-center bg-background-secondary p-2 rounded">
                                         <a href={`${API_URL}/${att.filePath}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{att.fileName}</a>
                                         <button onClick={() => handleDeleteAttachment(att.id)} type="button" className="text-red-500 text-xl">&times;</button>
                                     </div>
@@ -225,25 +226,25 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
                                 <button type="button" onClick={() => fileInputRef.current?.click()} disabled={!isEditMode || isUploading} className={`text-sm font-semibold text-blue-600 hover:text-blue-800 ${!isEditMode ? 'opacity-50 cursor-not-allowed' : ''}`}>
                                     {isUploading ? 'Subiendo...' : '+ Añadir archivo'}
                                 </button>
-                                {!isEditMode && <p className="text-xs text-gray-500">Guarda la tarea para poder adjuntar archivos.</p>}
+                                {!isEditMode && <p className="text-xs text-foreground-secondary">Guarda la tarea para poder adjuntar archivos.</p>}
                             </div>
                         </div>
 
                         {isEditMode && taskToEdit && <TaskDependencies task={taskToEdit} allTasks={allWorkspaceTasks} onUpdate={handleDependencyUpdate} />}
                         
                         {isEditMode && taskToEdit && (
-                            <div className="mt-6 pt-4 border-t">
+                            <div className="mt-6 pt-4 border-t border-border">
                                 <h3 className="text-lg font-semibold mb-3">Comentarios</h3>
                                 <div className="space-y-4 mb-4">
-                                    {comments.map(comment => (
+                                    {Array.isArray(comments) && comments.map(comment => (
                                         <div key={comment.id} className="flex items-start space-x-3">
                                             <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">{comment.userName.charAt(0)}</div>
                                             <div>
-                                                <div className="bg-gray-100 rounded-lg p-3">
-                                                    <p className="font-semibold text-sm">{comment.userName}</p>
-                                                    <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: comment.content }} />
+                                                <div className="bg-background-secondary rounded-lg p-3">
+                                                    <p className="font-semibold text-sm text-foreground-primary">{comment.userName}</p>
+                                                    <div className="prose prose-sm max-w-none text-foreground-primary" dangerouslySetInnerHTML={{ __html: comment.content }} />
                                                 </div>
-                                                <p className="text-xs text-gray-500 mt-1">{new Date(comment.createdAt).toLocaleString()}</p>
+                                                <p className="text-xs text-foreground-secondary mt-1">{new Date(comment.createdAt).toLocaleString()}</p>
                                             </div>
                                         </div>
                                     ))}
@@ -254,11 +255,10 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
                         
                         {error && <p className="text-red-500 mt-4">{error}</p>}
                     </div>
-
-                    <div className="p-4 border-t bg-gray-50 flex justify-end flex-shrink-0">
-                        <button type="button" onClick={onClose} className="mr-2 px-4 py-2 bg-gray-200 rounded" disabled={isSubmitting}>Cancelar</button>
-                        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded" disabled={isSubmitting}>{isSubmitting ? 'Guardando...' : (isEditMode ? 'Guardar Cambios' : 'Crear Tarea')}</button>
-                    </div>
+                    <div className="p-4 border-t border-border bg-background-secondary flex justify-end flex-shrink-0">
+                    <button type="button" onClick={onClose} className="mr-2 px-4 py-2 bg-muted text-muted-foreground rounded-md hover:bg-muted/80" disabled={isSubmitting}>Cancelar</button>
+                    <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md" disabled={isSubmitting}>{isSubmitting ? 'Guardando...' : (isEditMode ? 'Guardar Cambios' : 'Crear Tarea')}</button>
+                </div>
                 </form>
             </div>
         </div>
@@ -281,53 +281,30 @@ const CommentEditor: React.FC<{ members: User[]; onPost: (content: string) => vo
                         let component: ReactRenderer;
                         let popup: TippyInstance[];
                         return {
-                            onStart: props => {
+                            onStart: (props: any) => {
                                 component = new ReactRenderer(MentionList, { props, editor: props.editor });
-                                const getReferenceClientRect: GetReferenceClientRect = () => {
-                                    const rect = props.clientRect ? props.clientRect() : null;
-                                    return rect || new DOMRect(0, 0, 0, 0);
-                                };
-                                popup = tippy('body', {
-                                    getReferenceClientRect,
-                                    appendTo: () => document.body,
-                                    content: component.element,
-                                    showOnCreate: true,
-                                    interactive: true,
-                                    trigger: 'manual',
-                                    placement: 'bottom-start',
-                                });
+                                const getReferenceClientRect: GetReferenceClientRect = () => props.clientRect ? props.clientRect() : new DOMRect();
+                                popup = tippy('body', { getReferenceClientRect, appendTo: () => document.body, content: component.element, showOnCreate: true, interactive: true, trigger: 'manual', placement: 'bottom-start', });
                             },
-                            onUpdate(props) {
+                            onUpdate(props: any) {
                                 component.updateProps(props);
-                                const getReferenceClientRect: GetReferenceClientRect = () => {
-                                    const rect = props.clientRect ? props.clientRect() : null;
-                                    return rect || new DOMRect(0, 0, 0, 0);
-                                };
-                                if(popup && popup[0]) {
-                                    popup[0].setProps({ getReferenceClientRect });
-                                }
+                                const getReferenceClientRect: GetReferenceClientRect = () => props.clientRect ? props.clientRect() : new DOMRect();
+                                if(popup && popup[0]) { popup[0].setProps({ getReferenceClientRect }); }
                             },
-                            onKeyDown(props) {
-                                if (props.event.key === 'Escape') { 
-                                    if(popup && popup[0]) popup[0].hide(); 
-                                    return true; 
-                                }
+                            onKeyDown(props: any) {
+                                if (props.event.key === 'Escape') { if(popup && popup[0]) popup[0].hide(); return true; }
                                 return (component.ref as any)?.onKeyDown(props);
                             },
                             onExit() {
-                                if (popup && popup[0] && !popup[0].state.isDestroyed) {
-                                    popup[0].destroy();
-                                }
-                                if (component) {
-                                    component.destroy();
-                                }
+                                if (popup && popup[0] && !popup[0].state.isDestroyed) popup[0].destroy();
+                                if (component) component.destroy();
                             },
                         };
                     },
                 },
             }),
         ],
-        editorProps: { attributes: { class: 'prose max-w-none p-3 min-h-[100px] border border-gray-300 rounded focus:outline-none' } },
+        editorProps: { attributes: { class: 'prose dark:prose-invert max-w-none p-3 min-h-[100px] border border-border rounded bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring', } },
     });
 
     const handlePostClick = () => {
@@ -364,15 +341,22 @@ const MentionList = forwardRef((props: any, ref) => {
             return false;
         },
     }));
+
     return (
-        <div className="bg-white rounded-md shadow-lg border p-1">
+        <div className="relative bg-card border border-border rounded shadow-lg p-2">
             {props.items.length ? (
                 props.items.map((item: User, index: number) => (
-                    <button type="button" className={`block w-full text-left p-2 rounded-md ${index === selectedIndex ? 'bg-blue-100' : ''}`} key={index} onClick={() => selectItem(index)}>
+                    <button
+                        className={`w-full text-left p-2 rounded ${index === selectedIndex ? 'bg-background-secondary' : ''}`}
+                        key={index}
+                        onClick={() => selectItem(index)}
+                    >
                         {item.name}
                     </button>
                 ))
-            ) : (<div className="p-2">Sin resultados</div>)}
+            ) : (
+                <div className="p-2">No se encontraron resultados</div>
+            )}
         </div>
     );
 });

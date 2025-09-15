@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import type { Task, CustomField, FieldOption, NestedTask, User } from '../types';
-import TaskRow from './TaskRow.tsx';
-import { nestTasks } from '../utils/taskUtils.ts';
+import TaskRow from './TaskRow';
+import { nestTasks } from '../utils/taskUtils';
 
 type GroupByOption = 'default' | 'priority' | 'dueDate' | 'assignee' | 'status';
 
@@ -20,7 +20,8 @@ interface TaskGridProps {
 const TaskGrid: React.FC<TaskGridProps> = ({ tasks, customFields, fieldOptions, onOpenTask, onTaskUpdate, groupBy, allUsers, statusOptions, statusField }) => {
 
     const groupedTasks = useMemo(() => {
-        const topLevelNestedTasks: NestedTask[] = nestTasks(tasks);
+        const validTasks = Array.isArray(tasks) ? tasks : [];
+        const topLevelNestedTasks: NestedTask[] = nestTasks(validTasks);
         const groups = new Map<string, NestedTask[]>();
         const priorityField = customFields.find(f => f.name.toLowerCase() === 'prioridad');
 
@@ -74,42 +75,45 @@ const TaskGrid: React.FC<TaskGridProps> = ({ tasks, customFields, fieldOptions, 
         return groups;
     }, [tasks, groupBy, customFields, fieldOptions, allUsers, statusField, statusOptions]);
 
-    if (tasks.length === 0) {
-        return <div className="text-center p-10 bg-gray-50 rounded-lg"><h3 className="text-lg font-medium text-gray-500">No hay tareas que coincidan.</h3><p className="text-sm text-gray-400">Prueba a cambiar los filtros o a crear una nueva tarea.</p></div>
+    if (!Array.isArray(tasks) || tasks.length === 0) {
+        return (
+            <div className="text-center p-10 bg-background-secondary rounded-lg">
+                <h3 className="text-lg font-medium text-foreground-secondary">No hay tareas que coincidan.</h3>
+                <p className="text-sm text-foreground-secondary/70">Prueba a cambiar los filtros o a crear una nueva tarea.</p>
+            </div>
+        );
     }
 
-    // --- CORRECCIÓN EN EL ENCABEZADO DE LA TABLA ---
     const headerCustomFields = customFields.filter(f => f.name.toLowerCase() !== 'prioridad');
-    const totalColumns = 4 + headerCustomFields.length;
+    const totalColumns = 5 + headerCustomFields.length;
 
     return (
-        <div className="w-full overflow-x-auto bg-white rounded-lg shadow-md">
-            <table className="w-full text-sm text-left text-gray-500">
-                <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+        <div className="w-full overflow-x-auto bg-card rounded-lg shadow-md">
+            <table className="w-full text-sm text-left text-foreground-secondary">
+                <thead className="text-xs text-foreground-primary uppercase bg-background-secondary">
                     <tr>
                         <th scope="col" className="px-6 py-3 min-w-[300px]">Nombre de Tarea</th>
                         <th scope="col" className="px-6 py-3">Fecha Límite</th>
                         <th scope="col" className="px-6 py-3">Asignado</th>
                         <th scope="col" className="px-6 py-3">Prioridad</th>
-                        {/* Se asegura de mostrar todos los demás campos personalizados */}
                         {headerCustomFields.map(field => (<th key={field.id} scope="col" className="px-6 py-3">{field.name}</th>))}
                         <th scope="col" className="px-4 py-3 w-[100px]"><span className="sr-only">Acciones</span></th>
                     </tr>
                 </thead>
                 {Array.from(groupedTasks.entries()).map(([groupName, tasksInGroup]) => (
                     <tbody key={groupName}>
-                        <tr className="bg-gray-100 border-b sticky top-0 z-10">
+                        <tr className="bg-background-secondary border-b border-border sticky top-0 z-10">
                             <td colSpan={totalColumns} className="px-4 py-2">
-                                <span className="font-bold text-gray-800 uppercase text-xs">{groupName}</span>
-                                <span className="ml-2 text-gray-500 font-semibold">{tasksInGroup.length}</span>
+                                <span className="font-bold text-foreground-primary uppercase text-xs">{groupName}</span>
+                                <span className="ml-2 text-foreground-secondary font-semibold">{tasksInGroup.length}</span>
                             </td>
                         </tr>
                         {tasksInGroup.map(task => (
                             <TaskRow key={task.id} task={task} customFields={customFields} fieldOptions={fieldOptions} onOpenTask={onOpenTask} onTaskUpdate={onTaskUpdate} level={0} />
                         ))}
-                         <tr className="hover:bg-gray-50">
+                         <tr className="hover:bg-background-secondary">
                             <td colSpan={totalColumns} className="px-6 py-2">
-                                <button onClick={() => onOpenTask(null, tasksInGroup[0]?.listId || '')} className="text-xs text-gray-500 font-semibold hover:text-blue-600">
+                                <button onClick={() => onOpenTask(null, tasksInGroup[0]?.listId || '')} className="text-xs text-foreground-secondary font-semibold hover:text-blue-600">
                                     + Agregar Tarea
                                 </button>
                             </td>
@@ -120,4 +124,5 @@ const TaskGrid: React.FC<TaskGridProps> = ({ tasks, customFields, fieldOptions, 
         </div>
     );
 };
+
 export default TaskGrid;

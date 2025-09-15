@@ -1,15 +1,16 @@
-import React, { createContext, useState, useEffect } from 'react';
-// CAMBIO: Se usa 'import type' para el tipo ReactNode.
-import type { ReactNode } from 'react';
+// client/src/context/AuthContext.tsx
+
+import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { getMe } from '../services/api';
 import { Spinner } from '../components/ui/Spinner';
-import type { User } from '../types'; // También aplicamos la regla aquí.
+import type { User } from '../types';
 
-// El resto del archivo no cambia, pero lo incluyo para que sea completo.
 interface AuthContextType {
   user: User | null;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   loading: boolean;
+  token: string | null; // <-- Propiedad 'token' AÑADIDA
+  login: (newToken: string, userData: User) => void;
   logout: () => void;
 }
 
@@ -18,21 +19,29 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));
+
+  const login = (newToken: string, userData: User) => {
+    localStorage.setItem('token', newToken);
+    setToken(newToken);
+    setUser(userData);
+  };
 
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
+    setToken(null);
   };
-
+  
   useEffect(() => {
     const checkUser = async () => {
-      const token = localStorage.getItem('token');
-      if (token) {
+      const currentToken = localStorage.getItem('token');
+      if (currentToken) {
         try {
           const res = await getMe();
           setUser(res.data);
         } catch (error) {
-          console.error("Session check failed, token is invalid.", error);
+          console.error("La sesión guardada es inválida.", error);
           logout(); 
         }
       }
@@ -49,9 +58,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     );
   }
 
+  const value = { user, setUser, loading, token, login, logout };
+
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
+};
+
+export const useAuth = () => {
+    const context = useContext(AuthContext);
+    if (context === undefined) {
+        throw new Error('useAuth debe ser usado dentro de un AuthProvider');
+    }
+    return context;
 };

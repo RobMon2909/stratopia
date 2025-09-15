@@ -52,9 +52,9 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, customFields, fieldOptions, onO
 
     return (
         <>
-            <tr className="bg-white border-b hover:bg-gray-50 group">
-                <td className="px-6 py-2 font-medium text-gray-900 whitespace-nowrap">
-                    <div style={{ paddingLeft: `${level * 24}px` }} className="flex items-center gap-2">
+        <tr className="bg-card border-b border-border hover:bg-background-secondary group">
+                <td className="px-6 py-2 font-medium text-foreground-primary whitespace-nowrap">
+                <div style={{ paddingLeft: `${level * 24}px` }} className="flex items-center gap-2">
                         {/* --- NUEVO: Flecha para expandir/contraer --- */}
                         {hasChildren ? (
                             <button onClick={() => setIsExpanded(!isExpanded)} className="p-0.5 rounded-full hover:bg-gray-200">
@@ -65,7 +65,7 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, customFields, fieldOptions, onO
                         )}
                         
                         {/* (Iconos de dependencias) */}
-                        <EditableCell initialValue={task.title} onSave={handleTitleSave} />
+                    <EditableCell initialValue={task.title} onSave={handleTitleSave} />
                     </div>
                 </td>
                 <td className="px-6 py-2">{formatDate(task.dueDate)}</td>
@@ -76,9 +76,11 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, customFields, fieldOptions, onO
                     </div>
                 </td>
                 <td className="px-6 py-2">
-                    {priorityField ? renderCustomField(priorityField) : <span className="text-gray-400">-</span>}
-                </td>
-                {otherCustomFields.map(field => (<td key={field.id} className="px-6 py-2">{renderCustomField(field)}</td>))}
+        {priorityField ? renderCustomField(priorityField) : <span className="text-foreground-secondary">-</span>}
+    </td>
+                {otherCustomFields.map(field => (
+        <td key={field.id} className="px-6 py-2">{renderCustomField(field)}</td>
+    ))}
                 <td className="px-4 py-2 opacity-0 group-hover:opacity-100 transition-opacity text-center">
                     <button onClick={() => onOpenTask(task, task.listId)} className="font-medium text-blue-600 hover:underline text-xs" title="Abrir detalles">Abrir</button>
                     <button onClick={() => onOpenTask(null, task.listId, task.id)} className="ml-2 font-bold text-blue-600 hover:underline text-lg" title="Añadir Subtarea">+</button>

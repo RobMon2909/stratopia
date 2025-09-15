@@ -1,11 +1,12 @@
+// client/src/components/NotificationsPanel.tsx
+
 import React from 'react';
 
-// Definimos el tipo para una Notificación
 export interface Notification {
     id: string;
     actionType: 'ASSIGNED_TASK' | 'MENTIONED';
-    entityId: string; // Este es el ID de la tarea
-    isRead: number; // 0 o 1
+    entityId: string;
+    isRead: number | boolean;
     createdAt: string;
     actorName: string;
     taskTitle: string;
@@ -14,61 +15,45 @@ export interface Notification {
 interface NotificationsPanelProps {
     notifications: Notification[];
     onClose: () => void;
-    onNotificationClick: (taskId: string) => void; // <-- NUEVA PROP
+    onNotificationClick: (taskId: string) => void;
 }
 
 const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ notifications, onClose, onNotificationClick }) => {
-    
-    const renderNotificationMessage = (notif: Notification) => {
-        
-        // --- NUEVO: Enlace en el título de la tarea ---
-        const taskLink = (
-            <button 
-                onClick={() => onNotificationClick(notif.entityId)}
-                className="font-bold text-blue-600 hover:underline focus:outline-none"
-            >
-                "{notif.taskTitle}"
-            </button>
-        );
-
-        switch (notif.actionType) {
+    const getNotificationMessage = (notification: Notification) => {
+        switch (notification.actionType) {
             case 'ASSIGNED_TASK':
-                return (
-                    <span>
-                        <span className="font-bold">{notif.actorName}</span> te asignó la tarea {taskLink}.
-                    </span>
-                );
+                return <><b>{notification.actorName}</b> te asignó la tarea</>;
             case 'MENTIONED':
-                 return (
-                    <span>
-                        <span className="font-bold">{notif.actorName}</span> te mencionó en la tarea {taskLink}.
-                    </span>
-                );
+                return <><b>{notification.actorName}</b> te mencionó en la tarea</>;
             default:
-                return <span>Tienes una nueva notificación en la tarea {taskLink}.</span>;
+                return "Nueva notificación";
         }
     };
 
     return (
-        <div className="absolute top-16 right-0 w-80 bg-white rounded-lg shadow-xl border z-50">
-            <div className="p-3 flex justify-between items-center border-b">
-                <h3 className="font-semibold">Notificaciones</h3>
-                <button onClick={onClose} className="text-xl text-gray-500 hover:text-gray-800">&times;</button>
+        <div className="absolute top-12 right-0 w-80 bg-card border border-border rounded-lg shadow-lg z-20">
+            <div className="p-3 border-b border-border flex justify-between items-center">
+                <h3 className="font-semibold text-foreground-primary">Notificaciones</h3>
+                <button onClick={onClose} className="text-2xl text-foreground-secondary hover:text-foreground-primary">&times;</button>
             </div>
             <div className="max-h-96 overflow-y-auto">
-                {notifications.length > 0 ? (
-                    notifications.map(notif => (
-                        <div key={notif.id} className={`p-3 border-b ${!notif.isRead ? 'bg-blue-50' : ''}`}>
-                            <p className="text-sm text-gray-700">
-                                {renderNotificationMessage(notif)}
+                {Array.isArray(notifications) && notifications.length > 0 ? (
+                    notifications.map(n => (
+                        <div 
+                            key={n.id} 
+                            onClick={() => onNotificationClick(n.entityId)}
+                            className="p-3 border-b border-border hover:bg-background-secondary cursor-pointer"
+                        >
+                            <p className="text-sm text-foreground-primary">
+                                {getNotificationMessage(n)} <span className="text-blue-500 font-semibold">"{n.taskTitle}"</span>.
                             </p>
-                            <p className="text-xs text-gray-400 mt-1">
-                                {new Date(notif.createdAt).toLocaleString()}
+                            <p className="text-xs text-foreground-secondary mt-1">
+                                {new Date(n.createdAt).toLocaleString('es-ES')}
                             </p>
                         </div>
                     ))
                 ) : (
-                    <p className="p-4 text-sm text-gray-500 text-center">No tienes notificaciones.</p>
+                    <p className="p-4 text-sm text-foreground-secondary">No hay notificaciones nuevas.</p>
                 )}
             </div>
         </div>

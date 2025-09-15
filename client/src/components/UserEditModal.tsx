@@ -60,57 +60,51 @@ const UserEditModal: React.FC<UserEditModalProps> = ({ isOpen, onClose, onSave, 
 
     if (!isOpen) return null;
 
-    return (
+     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center" onClick={onClose}>
-            <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="bg-card text-card-foreground p-6 rounded-lg shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
                 <h2 className="text-2xl font-bold mb-4">{isEditMode ? 'Editar Usuario' : 'Crear Nuevo Usuario'}</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    {/* Campos de datos del usuario */}
                     <div>
-                        <label className="block text-sm font-medium">Nombre</label>
-                        <input type="text" name="name" value={formData.name} onChange={handleChange} className="w-full p-2 border rounded mt-1"/>
+                        <label className="block text-sm font-medium text-foreground-secondary">Nombre</label>
+                        <input type="text" name="name" value={formData.name} onChange={handleChange} className="w-full p-2 border border-border rounded mt-1 bg-input text-foreground"/>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium">Email</label>
-                        <input type="email" name="email" value={formData.email} onChange={handleChange} className="w-full p-2 border rounded mt-1"/>
+                        <label className="block text-sm font-medium text-foreground-secondary">Email</label>
+                        <input type="email" name="email" value={formData.email} onChange={handleChange} className="w-full p-2 border border-border rounded mt-1 bg-input text-foreground"/>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium">Contraseña</label>
-                        <input type="password" name="password" value={formData.password} onChange={handleChange} placeholder={isEditMode ? 'Dejar en blanco para no cambiar' : ''} className="w-full p-2 border rounded mt-1"/>
+                        <label className="block text-sm font-medium text-foreground-secondary">Contraseña</label>
+                        <input type="password" name="password" value={formData.password} placeholder={isEditMode ? 'Dejar en blanco para no cambiar' : ''} className="w-full p-2 border border-border rounded mt-1 bg-input text-foreground"/>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium">Rol</label>
-                        <select name="role" value={formData.role} onChange={handleChange} className="w-full p-2 border rounded mt-1">
+                        <label className="block text-sm font-medium text-foreground-secondary">Rol</label>
+                        <select name="role" value={formData.role} onChange={handleChange} className="w-full p-2 border border-border rounded mt-1 bg-input text-foreground">
                             <option value="ADMIN">Admin</option>
                             <option value="MEMBER">Miembro</option>
                             <option value="VIEWER">Observador</option>
                         </select>
                     </div>
                     
-                    {/* Sección de asignación de workspaces */}
                     {isEditMode && (
                         <div>
-                            <label className="block text-sm font-medium">Asignar a Espacios de Trabajo</label>
-                            <div className="mt-2 border rounded p-2 h-32 overflow-y-auto">
+                            <label className="block text-sm font-medium text-foreground-secondary">Asignar a Espacios de Trabajo</label>
+                            <div className="mt-2 border border-border rounded p-2 h-32 overflow-y-auto bg-background-secondary">
                                 {allWorkspaces.length > 0 ? allWorkspaces.map(ws => (
                                     <div key={ws.id}>
                                         <label className="flex items-center space-x-2">
-                                            <input 
-                                                type="checkbox"
-                                                checked={assignedWorkspaces.includes(ws.id)}
-                                                onChange={() => handleWorkspaceChange(ws.id)}
-                                            />
+                                            <input type="checkbox" checked={assignedWorkspaces.includes(ws.id)} onChange={() => handleWorkspaceChange(ws.id)} />
                                             <span>{ws.name}</span>
                                         </label>
                                     </div>
-                                )) : <p className="text-sm text-gray-500">No hay workspaces creados.</p>}
+                                )) : <p className="text-sm text-foreground-secondary">No hay workspaces creados.</p>}
                             </div>
                         </div>
                     )}
 
                     {error && <p className="text-red-500 text-sm">{error}</p>}
                     <div className="flex justify-end gap-4 pt-4">
-                        <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 rounded">Cancelar</button>
+                        <button type="button" onClick={onClose} className="px-4 py-2 bg-muted text-muted-foreground rounded hover:bg-muted/80">Cancelar</button>
                         <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded">Guardar</button>
                     </div>
                 </form>

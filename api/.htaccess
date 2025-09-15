@@ -1,16 +1,16 @@
-# Habilita el motor de reescritura de Apache
-RewriteEngine On
+# api/.htaccess
 
-# Esta es la regla clave. 
-# Comprueba si el encabezado Authorization existe en la petición.
-RewriteCond %{HTTP:Authorization} .
-# Si existe, crea una variable de entorno para PHP llamada HTTP_AUTHORIZATION
-# con el contenido del encabezado original.
-RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+# Directiva para reenviar el encabezado de autorización a PHP
+# Es más compatible que RewriteRule para esta tarea
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
 
-# Opcional: Esto ayuda a prevenir algunos problemas de CORS en Apache
+# Configuración de Cabeceras para CORS
+# Es importante que esto esté aquí para la comunicación entre servidores
 <IfModule mod_headers.c>
     Header set Access-Control-Allow-Origin "*"
     Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
     Header set Access-Control-Allow-Headers "Content-Type, Authorization"
 </IfModule>
+
+# Habilita el motor de reescritura para otras posibles reglas
+RewriteEngine On

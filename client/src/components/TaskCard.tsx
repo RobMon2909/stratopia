@@ -18,12 +18,13 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick }) => {
 
     return (
         <div 
-            onClick={onClick}
-            className="bg-white p-3 rounded-md shadow-sm border cursor-pointer hover:bg-gray-50"
-        >
-            <p>{task.title}</p>
-        </div>
-    );
+        onClick={onClick}
+        // Añadimos rounded-lg para esquinas más pronunciadas
+        className="bg-card text-card-foreground p-3 rounded-lg shadow-sm border border-border cursor-pointer hover:bg-background-secondary"
+    >
+        <p className="font-semibold">{task.title}</p>
+    </div>
+);
 };
 
 export default TaskCard;
