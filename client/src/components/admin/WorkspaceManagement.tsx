@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { adminGetAllWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace } from '../../services/api.ts';
+import { adminGetAllWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace } from '../../services/api';
 import type { Workspace } from '../../types';
-import WorkspaceEditModal from '../WorkspaceEditModal.tsx';
+import WorkspaceEditModal from '../WorkspaceEditModal';
 
 const WorkspaceManagement: React.FC = () => {
     const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -54,7 +54,7 @@ const WorkspaceManagement: React.FC = () => {
         }
     };
 
-    if (loading) return <p className="text-gray-500">Cargando workspaces...</p>;
+    if (loading) return <p className="text-foreground-secondary">Cargando workspaces...</p>;
     if (error) return <p className="text-red-500">{error}</p>;
 
     return (
@@ -65,19 +65,19 @@ const WorkspaceManagement: React.FC = () => {
                     + Crear Espacio
                 </button>
             </div>
-            <div className="bg-white shadow-md rounded-lg overflow-hidden">
+            <div className="bg-card shadow-md rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
-                        <thead className="bg-gray-50">
+                        <thead className="bg-background-secondary">
                             <tr>
-                                <th className="p-3 font-semibold text-sm uppercase">Nombre del Espacio</th>
-                                <th className="p-3 font-semibold text-sm uppercase text-right">Acciones</th>
+                                <th className="p-3 font-semibold text-sm uppercase text-foreground-primary">Nombre del Espacio</th>
+                                <th className="p-3 font-semibold text-sm uppercase text-foreground-primary text-right">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200">
+                        <tbody className="divide-y divide-border">
                             {workspaces.map(ws => (
-                                <tr key={ws.id} className="hover:bg-gray-50">
-                                    <td className="p-3">{ws.name}</td>
+                                <tr key={ws.id} className="hover:bg-background-secondary text-foreground-secondary">
+                                    <td className="p-3 font-medium text-foreground-primary">{ws.name}</td>
                                     <td className="p-3 text-right space-x-4">
                                         <button onClick={() => handleOpenModal(ws)} className="text-blue-600 hover:underline font-semibold">Editar</button>
                                         <button onClick={() => handleDeleteWorkspace(ws.id, ws.name)} className="text-red-600 hover:underline font-semibold">Eliminar</button>

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { getAllUsers, createUser, updateUser, deleteUser, updateUserWorkspaces } from '../../services/api.ts';
-import { useAuth } from '../../hooks/useAuth.ts';
+import { getAllUsers, createUser, updateUser, deleteUser, updateUserWorkspaces } from '../../services/api';
+import { useAuth } from '../../hooks/useAuth';
 import type { User } from '../../types';
-import UserEditModal from '../UserEditModal.tsx';
+import UserEditModal from '../UserEditModal';
 
 const UserManagement: React.FC = () => {
     const { user: adminUser } = useAuth();
@@ -62,7 +62,7 @@ const UserManagement: React.FC = () => {
         }
     };
 
-    if (loading) return <p className="text-gray-500">Cargando usuarios...</p>;
+    if (loading) return <p className="text-foreground-secondary">Cargando usuarios...</p>;
     if (error) return <p className="text-red-500">{error}</p>;
 
     return (
@@ -78,21 +78,21 @@ const UserManagement: React.FC = () => {
                     + Crear Usuario
                 </button>
             </div>
-            <div className="bg-white shadow-md rounded-lg overflow-hidden">
+            <div className="bg-card shadow-md rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
-                        <thead className="bg-gray-50">
+                        <thead className="bg-background-secondary">
                             <tr>
-                                <th className="p-3 font-semibold text-sm uppercase">Nombre</th>
-                                <th className="p-3 font-semibold text-sm uppercase">Email</th>
-                                <th className="p-3 font-semibold text-sm uppercase">Rol</th>
-                                <th className="p-3 font-semibold text-sm uppercase text-right">Acciones</th>
+                                <th className="p-3 font-semibold text-sm uppercase text-foreground-primary">Nombre</th>
+                                <th className="p-3 font-semibold text-sm uppercase text-foreground-primary">Email</th>
+                                <th className="p-3 font-semibold text-sm uppercase text-foreground-primary">Rol</th>
+                                <th className="p-3 font-semibold text-sm uppercase text-foreground-primary text-right">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200">
+                        <tbody className="divide-y divide-border">
                             {users.map(user => (
-                                <tr key={user.id} className="hover:bg-gray-50">
-                                    <td className="p-3">{user.name}</td>
+                                <tr key={user.id} className="hover:bg-background-secondary text-foreground-secondary">
+                                    <td className="p-3 font-medium text-foreground-primary">{user.name}</td>
                                     <td className="p-3">{user.email}</td>
                                     <td className="p-3">{user.role}</td>
                                     <td className="p-3 text-right space-x-4">

@@ -30,7 +30,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onOpenTask, onDataNe
     
     // --- LÓGICA CORREGIDA PARA GUARDAR EL CAMBIO ---
     const handleEventDrop = async (info: any) => {
-        const { event, oldEvent } = info;
+        const { event } = info;
         const updatedTaskPayload = {
             taskId: event.id,
             startDate: event.startStr,
