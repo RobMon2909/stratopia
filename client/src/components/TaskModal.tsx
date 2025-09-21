@@ -17,6 +17,31 @@ interface TaskModalProps {
     parentId?: string; workspaceMembers: User[]; allWorkspaceTasks: Task[];
 }
 
+// --- INICIO DE MEJORA: Componente para previsualización de archivos ---
+const AttachmentPreview: React.FC<{ attachment: Attachment; onDelete: (id: string) => void }> = ({ attachment, onDelete }) => {
+    const fileExtension = attachment.fileName.split('.').pop()?.toLowerCase() || '';
+    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileExtension);
+    const fileUrl = `${API_URL}/${attachment.filePath}`;
+
+    return (
+        <div className="flex justify-between items-center bg-background-secondary p-2 rounded-md group">
+            <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-sm">
+                {isImage ? (
+                    <img src={fileUrl} alt={attachment.fileName} className="w-10 h-10 object-cover rounded" />
+                ) : (
+                    <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
+                        <span className="text-xs font-mono text-muted-foreground">{fileExtension.toUpperCase()}</span>
+                    </div>
+                )}
+                <span className="text-foreground hover:underline">{attachment.fileName}</span>
+            </a>
+            <button onClick={() => onDelete(attachment.id)} type="button" className="text-red-500 text-xl opacity-0 group-hover:opacity-100 transition-opacity">&times;</button>
+        </div>
+    );
+};
+// --- FIN DE MEJORA ---
+
+
 const MultiSelectDropdown: React.FC<{ options: FieldOption[]; selectedIds: string[]; onChange: (selectedIds: string[]) => void;}> = ({ options, selectedIds, onChange }) => {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -30,7 +55,7 @@ const MultiSelectDropdown: React.FC<{ options: FieldOption[]; selectedIds: strin
         onChange(newSelectedIds);
     };
     const selectedOptions = Array.isArray(options) ? options.filter(opt => selectedIds.includes(opt.id)) : [];
-    return ( <div className="relative" ref={dropdownRef}> <div onClick={() => setIsOpen(!isOpen)} className="w-full p-2 border border-border rounded bg-input cursor-pointer min-h-[42px] flex flex-wrap gap-1 items-center"> {selectedOptions.length > 0 ? selectedOptions.map(opt => ( <span key={opt.id} style={{ backgroundColor: opt.color + '30', color: opt.color }} className="px-2 py-1 text-xs font-bold rounded"> {opt.value} </span> )) : <span className="text-foreground-secondary">-- Sin seleccionar --</span>} </div> {isOpen && ( <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded shadow-lg max-h-60 overflow-y-auto"> {options.map(opt => ( <div key={opt.id} onClick={() => handleSelect(opt.id)} className="p-2 hover:bg-background-secondary cursor-pointer flex items-center"> <input type="checkbox" readOnly checked={selectedIds.includes(opt.id)} className="mr-3 h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"/> <span style={{ backgroundColor: opt.color + '30', color: opt.color }} className="px-2 py-1 text-xs font-bold rounded"> {opt.value} </span> </div> ))} </div> )} </div> );
+    return ( <div className="relative" ref={dropdownRef}> <div onClick={() => setIsOpen(!isOpen)} className="w-full p-2 border border-border rounded-md bg-input cursor-pointer min-h-[42px] flex flex-wrap gap-1 items-center"> {selectedOptions.length > 0 ? selectedOptions.map(opt => ( <span key={opt.id} style={{ backgroundColor: opt.color + '30', color: opt.color }} className="px-2 py-1 text-xs font-bold rounded"> {opt.value} </span> )) : <span className="text-foreground-secondary">-- Sin seleccionar --</span>} </div> {isOpen && ( <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded shadow-lg max-h-60 overflow-y-auto"> {options.map(opt => ( <div key={opt.id} onClick={() => handleSelect(opt.id)} className="p-2 hover:bg-background-secondary cursor-pointer flex items-center"> <input type="checkbox" readOnly checked={selectedIds.includes(opt.id)} className="mr-3 h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"/> <span style={{ backgroundColor: opt.color + '30', color: opt.color }} className="px-2 py-1 text-xs font-bold rounded"> {opt.value} </span> </div> ))} </div> )} </div> );
 };
 
 const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEdit, onTaskCreated, onDataNeedsRefresh, customFields, parentId, workspaceMembers, allWorkspaceTasks }) => {
@@ -154,7 +179,6 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" onClick={onClose}>
-            {/* El 'bg-card' le da el fondo sólido */}
             <div className="bg-card text-card-foreground rounded-lg shadow-2xl w-full max-w-4xl flex flex-col h-[90vh]" onClick={e => e.stopPropagation()}>
             <form onSubmit={handleSubmit} className="flex flex-col h-full">
                 <div className="p-4 border-b border-border flex justify-between items-center flex-shrink-0">
@@ -163,12 +187,12 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
                     </div>
                     <div className="p-6 flex-grow overflow-y-auto space-y-6">
                         <label className="block text-sm font-medium text-foreground-secondary ">Descripción</label>
+                        {/* Tu RichTextEditor ya soporta contenido enriquecido. Asegúrate que su configuración interna permita pegar imágenes. */}
                         <RichTextEditor content={description} onChange={setDescription} placeholder="Añade una descripción..." />
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div> 
                                 <label className="block text-sm font-medium text-foreground-secondary">Fecha Límite</label> 
-                                {/* Añadimos 'rounded-md' a los inputs */}
                                 <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="mt-1 p-2 border border-border rounded-md w-full bg-input text-foreground" /> 
                             </div>
                             <div> 
@@ -179,6 +203,23 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
                         
                         {customFields.map(field => {
                             const currentValue = customFieldValues[field.id] || {};
+
+                            // --- INICIO DE MEJORA: Soporte para campo de texto ---
+                            if (field.type === 'text') {
+                                return (
+                                    <div key={field.id}>
+                                        <label className="block text-sm font-medium text-foreground-secondary">{field.name}</label>
+                                        <input 
+                                            type="text"
+                                            value={currentValue.value || ''}
+                                            onChange={(e) => handleCustomFieldChange(field.id, e.target.value)}
+                                            className="mt-1 p-2 border border-border rounded-md w-full bg-input text-foreground"
+                                        />
+                                    </div>
+                                )
+                            }
+                            // --- FIN DE MEJORA ---
+                            
                             if (field.type === 'dropdown') {
                                 return (
                                     <div key={field.id}>
@@ -213,14 +254,13 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
                         
                         <div>
                             <label className="block text-sm font-medium text-foreground-secondary">Archivos Adjuntos</label>
+                            {/* --- INICIO DE MEJORA: Bucle de previsualización --- */}
                             <div className="mt-2 space-y-2">
                                 {Array.isArray(attachments) && attachments.map(att => (
-                                    <div key={att.id} className="flex justify-between items-center bg-background-secondary p-2 rounded">
-                                        <a href={`${API_URL}/${att.filePath}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{att.fileName}</a>
-                                        <button onClick={() => handleDeleteAttachment(att.id)} type="button" className="text-red-500 text-xl">&times;</button>
-                                    </div>
+                                    <AttachmentPreview key={att.id} attachment={att} onDelete={handleDeleteAttachment} />
                                 ))}
                             </div>
+                            {/* --- FIN DE MEJORA --- */}
                             <div className="mt-2">
                                 <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} disabled={!isEditMode || isUploading} />
                                 <button type="button" onClick={() => fileInputRef.current?.click()} disabled={!isEditMode || isUploading} className={`text-sm font-semibold text-blue-600 hover:text-blue-800 ${!isEditMode ? 'opacity-50 cursor-not-allowed' : ''}`}>

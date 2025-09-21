@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react';
+// client/src/components/TaskGrid.tsx
+import React, { useState, useMemo, useEffect } from 'react';
+import { DragDropContext, Droppable, Draggable, OnDragEndResponder } from '@hello-pangea/dnd';
+import { useReactTable, getCoreRowModel, flexRender, ColumnDef, ColumnSizingState, Header } from '@tanstack/react-table';
 import type { Task, CustomField, FieldOption, NestedTask, User } from '../types';
 import TaskRow from './TaskRow';
 import { nestTasks } from '../utils/taskUtils';
-
-type GroupByOption = 'default' | 'priority' | 'dueDate' | 'assignee' | 'status';
 
 interface TaskGridProps {
     tasks: Task[];
@@ -11,116 +12,133 @@ interface TaskGridProps {
     fieldOptions: { [fieldId: string]: FieldOption[] };
     onOpenTask: (task: Task | null, listId: string, parentId?: string) => void;
     onTaskUpdate: (updatedTask: Partial<Task> & { id: string }) => void;
-    groupBy: GroupByOption;
     allUsers: User[];
-    statusOptions: FieldOption[];
-    statusField: CustomField | undefined;
 }
 
-const TaskGrid: React.FC<TaskGridProps> = ({ tasks, customFields, fieldOptions, onOpenTask, onTaskUpdate, groupBy, allUsers, statusOptions, statusField }) => {
+const DraggableHeader: React.FC<{ header: Header<NestedTask, unknown> }> = ({ header }) => {
+    return (
+        <div 
+            className="px-6 py-3 relative group flex items-center justify-between font-bold" // Títulos en negritas
+            style={{ width: header.getSize() }}
+        >
+            {flexRender(header.column.columnDef.header, header.getContext())}
+            <div
+                onMouseDown={(e) => {
+                    e.stopPropagation(); // Evita que el drag se active al redimensionar
+                    header.getResizeHandler()(e);
+                }}
+                onTouchStart={(e) => {
+                    e.stopPropagation(); // Soporte para táctil
+                    header.getResizeHandler()(e);
+                }}
+                className={`absolute right-0 top-0 h-full w-1.5 bg-blue-400 opacity-0 group-hover:opacity-100 cursor-col-resize select-none touch-none`}
+            />
+        </div>
+    );
+};
 
-    const groupedTasks = useMemo(() => {
-        const validTasks = Array.isArray(tasks) ? tasks : [];
-        const topLevelNestedTasks: NestedTask[] = nestTasks(validTasks);
-        const groups = new Map<string, NestedTask[]>();
-        const priorityField = customFields.find(f => f.name.toLowerCase() === 'prioridad');
+const TaskGrid: React.FC<TaskGridProps> = ({ tasks, customFields, fieldOptions, onOpenTask, onTaskUpdate, allUsers }) => {
+    
+    const nestedTasks = useMemo(() => nestTasks(Array.isArray(tasks) ? tasks : []), [tasks]);
 
-        if (groupBy === 'default') {
-            groups.set('Todas las Tareas', topLevelNestedTasks);
-            return groups;
-        }
+    const columns = useMemo<ColumnDef<NestedTask>[]>(() => [
+        { id: 'title', header: 'Nombre de Tarea', size: 350, accessorFn: (row: NestedTask) => row.title },
+        { id: 'dueDate', header: 'Fecha Límite', size: 150, accessorFn: (row: NestedTask) => row.dueDate },
+        { id: 'assignees', header: 'Asignado', size: 150, accessorFn: (row: NestedTask) => row.assignees },
+        ...customFields
+            // --- Filtra y excluye el campo "Documentos" ---
+            .filter(field => field.name.toLowerCase() !== 'documentos')
+            .map(field => ({
+                id: field.id,
+                header: field.name,
+                size: 150,
+                accessorFn: (row: NestedTask) => row.customFields?.[field.id],
+            })),
+    ], [customFields]);
 
-        topLevelNestedTasks.forEach(task => {
-            let groupKey: string = 'Sin Agrupar';
-            switch (groupBy) {
-                case 'priority':
-                    if (priorityField && task.customFields?.[priorityField.id]?.optionId) {
-                        const optionId = task.customFields[priorityField.id].optionId;
-                        const priorityOptions = fieldOptions[priorityField.id] || [];
-                        const option = priorityOptions.find(opt => opt.id === optionId);
-                        groupKey = option ? option.value : 'Sin Prioridad';
-                    } else {
-                        groupKey = 'Sin Prioridad';
-                    }
-                    break;
-                case 'status':
-                    if (statusField && task.customFields?.[statusField.id]?.optionId) {
-                        const optionId = task.customFields[statusField.id].optionId;
-                        const option = statusOptions.find(opt => opt.id === optionId);
-                        groupKey = option ? option.value : 'Sin Estado';
-                    } else {
-                        groupKey = 'Sin Estado';
-                    }
-                    break;
-                case 'assignee':
-                    if (task.assignees && task.assignees.length > 0) {
-                        groupKey = task.assignees[0].name;
-                    } else {
-                        groupKey = 'Sin Asignar';
-                    }
-                    break;
-                case 'dueDate':
-                    if (task.dueDate) {
-                        groupKey = new Date(task.dueDate.replace(/-/g, '/')).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
-                    } else {
-                        groupKey = 'Sin Fecha Límite';
-                    }
-                    break;
-            }
-            if (!groups.has(groupKey)) {
-                groups.set(groupKey, []);
-            }
-            groups.get(groupKey)!.push(task);
-        });
-        return groups;
-    }, [tasks, groupBy, customFields, fieldOptions, allUsers, statusField, statusOptions]);
+    const columnIds = useMemo(() => columns.map(c => c.id!), [columns]);
 
-    if (!Array.isArray(tasks) || tasks.length === 0) {
-        return (
-            <div className="text-center p-10 bg-background-secondary rounded-lg">
-                <h3 className="text-lg font-medium text-foreground-secondary">No hay tareas que coincidan.</h3>
-                <p className="text-sm text-foreground-secondary/70">Prueba a cambiar los filtros o a crear una nueva tarea.</p>
-            </div>
-        );
+    const [columnOrder, setColumnOrder] = useState<string[]>(() => {
+        const savedOrder = localStorage.getItem('taskGridColumnOrder');
+        return savedOrder ? JSON.parse(savedOrder) : columnIds;
+    });
+
+    const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => {
+        const savedSizing = localStorage.getItem('taskGridColumnSizing');
+        return savedSizing ? JSON.parse(savedSizing) : {};
+    });
+
+    useEffect(() => { localStorage.setItem('taskGridColumnOrder', JSON.stringify(columnOrder)); }, [columnOrder]);
+    useEffect(() => { localStorage.setItem('taskGridColumnSizing', JSON.stringify(columnSizing)); }, [columnSizing]);
+    
+    const table = useReactTable({
+        data: nestedTasks,
+        columns,
+        getCoreRowModel: getCoreRowModel(),
+        state: { columnOrder, columnSizing },
+        onColumnOrderChange: setColumnOrder,
+        onColumnSizingChange: setColumnSizing,
+        columnResizeMode: 'onChange',
+    });
+
+    const onDragEnd: OnDragEndResponder = (result) => {
+        if (!result.destination) return;
+        const newOrder = Array.from(columnOrder);
+        const [removed] = newOrder.splice(result.source.index, 1);
+        newOrder.splice(result.destination.index, 0, removed);
+        setColumnOrder(newOrder);
+    };
+
+    if (tasks.length === 0) {
+        return <div className="text-center p-10">No hay tareas que coincidan o no has creado ninguna.</div>;
     }
 
-    const headerCustomFields = customFields.filter(f => f.name.toLowerCase() !== 'prioridad');
-    const totalColumns = 5 + headerCustomFields.length;
+    const gridTemplateColumns = useMemo(
+        () => table.getHeaderGroups()[0].headers.map(h => `${h.getSize()}px`).join(' '),
+        [table.getHeaderGroups()[0].headers]
+    );
 
     return (
-        <div className="w-full overflow-x-auto bg-card rounded-lg shadow-md">
-            <table className="w-full text-sm text-left text-foreground-secondary">
-                <thead className="text-xs text-foreground-primary uppercase bg-background-secondary">
-                    <tr>
-                        <th scope="col" className="px-6 py-3 min-w-[300px]">Nombre de Tarea</th>
-                        <th scope="col" className="px-6 py-3">Fecha Límite</th>
-                        <th scope="col" className="px-6 py-3">Asignado</th>
-                        <th scope="col" className="px-6 py-3">Prioridad</th>
-                        {headerCustomFields.map(field => (<th key={field.id} scope="col" className="px-6 py-3">{field.name}</th>))}
-                        <th scope="col" className="px-4 py-3 w-[100px]"><span className="sr-only">Acciones</span></th>
-                    </tr>
-                </thead>
-                {Array.from(groupedTasks.entries()).map(([groupName, tasksInGroup]) => (
-                    <tbody key={groupName}>
-                        <tr className="bg-background-secondary border-b border-border sticky top-0 z-10">
-                            <td colSpan={totalColumns} className="px-4 py-2">
-                                <span className="font-bold text-foreground-primary uppercase text-xs">{groupName}</span>
-                                <span className="ml-2 text-foreground-secondary font-semibold">{tasksInGroup.length}</span>
-                            </td>
-                        </tr>
-                        {tasksInGroup.map(task => (
-                            <TaskRow key={task.id} task={task} customFields={customFields} fieldOptions={fieldOptions} onOpenTask={onOpenTask} onTaskUpdate={onTaskUpdate} level={0} />
-                        ))}
-                         <tr className="hover:bg-background-secondary">
-                            <td colSpan={totalColumns} className="px-6 py-2">
-                                <button onClick={() => onOpenTask(null, tasksInGroup[0]?.listId || '')} className="text-xs text-foreground-secondary font-semibold hover:text-blue-600">
-                                    + Agregar Tarea
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
+        <div className="w-full text-sm text-left text-foreground-secondary bg-card rounded-lg shadow-md">
+            <div className="text-xs text-foreground-primary uppercase bg-background-secondary sticky top-0 z-10 border-b border-border">
+                {table.getHeaderGroups().map(headerGroup => (
+                    <DragDropContext onDragEnd={onDragEnd} key={headerGroup.id}>
+                        <Droppable droppableId="droppable-headers" direction="horizontal">
+                            {(provided) => (
+                                <div className="flex" ref={provided.innerRef} {...provided.droppableProps}>
+                                    {headerGroup.headers.map(header => (
+                                        <Draggable key={header.id} draggableId={header.id} index={header.index}>
+                                            {(provided) => (
+                                                <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}>
+                                                    <DraggableHeader header={header} />
+                                                </div>
+                                            )}
+                                        </Draggable>
+                                    ))}
+                                    {provided.placeholder}
+                                </div>
+                            )}
+                        </Droppable>
+                    </DragDropContext>
                 ))}
-            </table>
+            </div>
+
+            <div>
+                {table.getRowModel().rows.map(row => (
+                    <TaskRow
+                        key={row.original.id}
+                        task={row.original}
+                        gridTemplateColumns={gridTemplateColumns}
+                        cells={row.getVisibleCells()}
+                        customFields={customFields}
+                        fieldOptions={fieldOptions}
+                        onOpenTask={onOpenTask}
+                        onTaskUpdate={onTaskUpdate}
+                        level={0}
+                        allUsers={allUsers}
+                    />
+                ))}
+            </div>
         </div>
     );
 };

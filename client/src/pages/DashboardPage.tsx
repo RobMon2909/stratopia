@@ -1,12 +1,11 @@
 // client/src/pages/DashboardPage.tsx
-// VERSIÓN COMPLETA RESTAURADA, SIN OMISIONES, CON TODAS LAS CORRECCIONES
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { 
     getWorkspaces, createWorkspace, getWorkspaceLists, getCustomFields, 
     getFieldOptions, getWorkspaceMembers, searchTasks, 
-    getNotifications, markNotificationsAsRead 
+    getNotifications, markNotificationsAsRead,
+    updateTask 
 } from '@/services/api';
 import socketService from '@/services/socketService';
 import NotificationsPanel from '@/components/NotificationsPanel';
@@ -175,7 +174,38 @@ const DashboardPage: React.FC = () => {
     
     const handleDataNeedsRefresh = () => { fetchDataForWorkspace(); };
     
-    const handleTaskUpdated = () => { fetchDataForWorkspace(); };
+    const handleTaskUpdated = (updatedTaskData: Partial<Task> & { id: string }) => {
+        setLists(currentLists =>
+            currentLists.map(list => ({
+                ...list,
+                tasks: list.tasks.map(task =>
+                    task.id === updatedTaskData.id ? { ...task, ...updatedTaskData } : task
+                ),
+            }))
+        );
+
+        const { id, customFields: cfObject, assignees, ...restOfTaskData } = updatedTaskData;
+
+        const customFieldsPayload = cfObject 
+            ? Object.entries(cfObject).map(([fieldId, data]) => ({ fieldId, ...data }))
+            : undefined;
+
+        const assigneeIdsPayload = assignees ? assignees.map(a => a.id) : undefined;
+        
+        const payload = {
+            taskId: id,
+            ...restOfTaskData,
+            customFields: customFieldsPayload,
+            assigneeIds: assigneeIdsPayload,
+            description: restOfTaskData.description ?? undefined,
+        };
+
+        updateTask(payload).catch(error => {
+            console.error("Falló la actualización de la tarea:", error.response?.data || error);
+            alert("Error al guardar el cambio. Se revertirá la acción.");
+            fetchDataForWorkspace();
+        });
+    };
     
     const handleFilterChange = (filterName: string, value: string) => { setActiveFilters(prev => ({ ...prev, [filterName]: value })); };
     
@@ -219,7 +249,7 @@ const DashboardPage: React.FC = () => {
                 return <CalendarView tasks={filteredTasks} onOpenTask={handleOpenTaskModal} onDataNeedsRefresh={handleDataNeedsRefresh} />;
             case 'list':
             default:
-                return <TaskGrid tasks={filteredTasks} customFields={customFields} fieldOptions={fieldOptions} onOpenTask={handleOpenTaskModal} onTaskUpdate={handleTaskUpdated} groupBy={groupBy} allUsers={workspaceMembers} statusOptions={statusOptions} statusField={statusField} />;
+                return <TaskGrid tasks={filteredTasks} customFields={customFields} fieldOptions={fieldOptions} onOpenTask={handleOpenTaskModal} onTaskUpdate={handleTaskUpdated} allUsers={workspaceMembers} />;
         }
     };
     
@@ -237,8 +267,8 @@ const DashboardPage: React.FC = () => {
                         onClick={(e) => { e.preventDefault(); setActiveWorkspace(ws); }}
                         className={`block py-2 px-3 rounded-md font-medium transition-colors ${
                             activeWorkspace?.id === ws.id
-                                ? 'bg-blue-100 text-blue-700' // Estilo cuando está activo
-                                : 'text-foreground-secondary hover:bg-blue-100 hover:text-blue-700' // Estilo normal y al pasar el mouse
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'text-foreground-secondary hover:bg-blue-100 hover:text-blue-700'
                         }`}
                     >
                         {ws.name}

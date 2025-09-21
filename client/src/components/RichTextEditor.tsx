@@ -1,9 +1,8 @@
 // client/src/components/RichTextEditor.tsx
-// VERSIÓN FINAL CON ESTILOS DE TEMA
-
 import React from 'react';
 import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import Image from '@tiptap/extension-image'; // --- NUEVO: Importar la extensión de imagen ---
 
 // --- SUB-COMPONENTE: BARRA DE HERRAMIENTAS ---
 const MenuBar: React.FC<{ editor: Editor | null }> = ({ editor }) => {
@@ -11,12 +10,18 @@ const MenuBar: React.FC<{ editor: Editor | null }> = ({ editor }) => {
     return null;
   }
   
-  // Clases para los botones para que tengan un feedback visual
   const buttonClass = "px-2 py-1 text-sm rounded-md hover:bg-muted hover:text-muted-foreground";
   const activeButtonClass = "bg-muted text-muted-foreground";
 
+  // --- NUEVO: Función para añadir imagen por URL ---
+  const addImage = () => {
+    const url = window.prompt('URL de la imagen');
+    if (url) {
+      editor.chain().focus().setImage({ src: url }).run();
+    }
+  };
+
   return (
-    // Se reemplazan los colores fijos por clases de tema
     <div className="border-b border-border bg-background-secondary p-2 flex flex-wrap gap-x-4 gap-y-1">
       <button 
         type="button" 
@@ -38,6 +43,10 @@ const MenuBar: React.FC<{ editor: Editor | null }> = ({ editor }) => {
         className={`${buttonClass} ${editor.isActive('strike') ? 'line-through' : ''} ${editor.isActive('strike') ? activeButtonClass : ''}`}
       >
         Tachado
+      </button>
+      {/* --- NUEVO: Botón para añadir imagen --- */}
+      <button type="button" onClick={addImage} className={buttonClass}>
+        Imagen
       </button>
       <button 
         type="button" 
@@ -66,28 +75,32 @@ interface RichTextEditorProps {
 
 const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, placeholder }) => {
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: [
+      StarterKit,
+      Image, // --- NUEVO: Añadir la extensión a Tiptap ---
+    ],
     content: content,
     editorProps: {
       attributes: {
-        // Se aplican clases para el área de escritura
         class: 'prose dark:prose-invert max-w-none p-3 min-h-[150px] focus:outline-none',
       },
-      // Añadimos el placeholder directamente aquí
-      // Tiptap lo manejará internamente
-      // placeholder: placeholder, // Esta línea no es necesaria aquí, se pasa a EditorContent
     },
     onUpdate({ editor }) {
-      // Evitamos enviar una actualización si el contenido está "vacío" (solo un párrafo)
       const isContentEmpty = editor.getText().trim().length === 0;
       onChange(isContentEmpty ? '' : editor.getHTML());
     },
   });
 
   return (
-    // Contenedor principal que aplica el borde y el color de fondo de la tarjeta
     <div className="bg-card border border-border rounded-lg overflow-hidden">
       <MenuBar editor={editor} />
+      {/* Con la extensión 'Image' activa, Tiptap manejará automáticamente
+        el pegado de imágenes desde el portapapeles y el arrastrar y soltar.
+        Nota: Esto insertará la imagen como datos base64. Para una solución
+        más robusta, se necesitaría interceptar el evento de pegado, subir
+        la imagen a tu servidor y luego insertar la URL resultante.
+        Pero para empezar, esto es funcional.
+      */}
       <EditorContent editor={editor} placeholder={placeholder} />
     </div>
   );
