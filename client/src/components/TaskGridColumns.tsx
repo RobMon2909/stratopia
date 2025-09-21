@@ -22,26 +22,29 @@ export const getTaskGridColumns = (
         {
             id: 'title',
             header: 'Nombre de Tarea',
-            size: 450, // Ancho inicial
+            size: 450, 
             cell: ({ row }) => {
                 const task = row.original;
                 let statusName = 'Pendiente';
                 let statusColor = '#6B7280';
 
-                if (statusField && task.customFields?.[statusField.id]?.optionId) {
-                    const option = (fieldOptions[statusField.id] || []).find(opt => opt.id === task.customFields[statusField.id].optionId);
-                    if (option) {
-                        statusName = option.value;
-                        statusColor = option.color;
+                // --- SOLUCIÓN: Lógica de acceso seguro a customFields ---
+                if (statusField && task.customFields) {
+                    const statusValue = task.customFields[statusField.id];
+                    if (statusValue?.optionId) {
+                        const option = (fieldOptions[statusField.id] || []).find(opt => opt.id === statusValue.optionId);
+                        if (option) {
+                            statusName = option.value;
+                            statusColor = option.color;
+                        }
                     }
                 }
 
                 return (
                     <div 
                         className="flex items-center gap-2" 
-                        style={{ paddingLeft: `${row.depth * 24}px` }} // Indentación para subtareas
+                        style={{ paddingLeft: `${row.depth * 24}px` }} 
                     >
-                        {/* Flecha para expandir/contraer subtareas */}
                         {row.getCanExpand() && (
                             <button onClick={row.getToggleExpandedHandler()} className="p-0.5 rounded-full hover:bg-muted">
                                 <svg className={`w-4 h-4 text-foreground-secondary transition-transform ${row.getIsExpanded() ? 'rotate-90' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
@@ -97,7 +100,6 @@ export const getTaskGridColumns = (
                 return <Tag text={option.value} color={option.color} />;
             }
         },
-        // Mapeamos el resto de campos personalizados como columnas
         ...otherCustomFields.map(field => ({
             id: field.id,
             header: field.name,

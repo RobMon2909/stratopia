@@ -175,15 +175,25 @@ const DashboardPage: React.FC = () => {
     const handleDataNeedsRefresh = () => { fetchDataForWorkspace(); };
     
     const handleTaskUpdated = (updatedTaskData: Partial<Task> & { id: string }) => {
+        // --- SOLUCIÓN: Lógica de actualización no-destructiva ---
+        // 1. Actualización visual optimista (el usuario ve el cambio al instante)
         setLists(currentLists =>
             currentLists.map(list => ({
                 ...list,
-                tasks: list.tasks.map(task =>
-                    task.id === updatedTaskData.id ? { ...task, ...updatedTaskData } : task
-                ),
+                tasks: list.tasks.map(task => {
+                    if (task.id === updatedTaskData.id) {
+                        const newCustomFields = updatedTaskData.customFields
+                            ? { ...task.customFields, ...updatedTaskData.customFields }
+                            : task.customFields;
+                        
+                        return { ...task, ...updatedTaskData, customFields: newCustomFields };
+                    }
+                    return task;
+                }),
             }))
         );
 
+        // 2. Construye el payload para la API SÓLO con los datos que cambiaron
         const { id, customFields: cfObject, assignees, ...restOfTaskData } = updatedTaskData;
 
         const customFieldsPayload = cfObject 
@@ -192,14 +202,19 @@ const DashboardPage: React.FC = () => {
 
         const assigneeIdsPayload = assignees ? assignees.map(a => a.id) : undefined;
         
-        const payload = {
+        const payload: any = { // Se usa 'any' temporalmente para poder modificar description
             taskId: id,
             ...restOfTaskData,
             customFields: customFieldsPayload,
             assigneeIds: assigneeIdsPayload,
-            description: restOfTaskData.description ?? undefined,
         };
 
+        // --- SOLUCIÓN: Corrige el error de TypeScript `string | null` vs `string | undefined` ---
+        if ('description' in payload) {
+            payload.description = payload.description ?? undefined;
+        }
+
+        // 3. Llamada a la API con el payload parcial y correcto
         updateTask(payload).catch(error => {
             console.error("Falló la actualización de la tarea:", error.response?.data || error);
             alert("Error al guardar el cambio. Se revertirá la acción.");
@@ -241,6 +256,17 @@ const DashboardPage: React.FC = () => {
         return tasksToProcess;
     }, [tasksToDisplay, activeFilters, statusField, statusOptions, hideDoneTasks]);
 
+    const handleTasksReorder = (reorderedTasks: Task[]) => {
+        const reorderedTasksMap = new Map(reorderedTasks.map(task => [task.id, task]));
+        const newAllTasks = allTasks.map(task => reorderedTasksMap.get(task.id) || task);
+        setLists(currentLists =>
+            currentLists.map(list => ({
+                ...list,
+                tasks: newAllTasks.filter(task => task.listId === list.id),
+            }))
+        );
+    };
+
     const renderCurrentView = () => {
         switch(currentView) {
             case 'board':
@@ -249,7 +275,15 @@ const DashboardPage: React.FC = () => {
                 return <CalendarView tasks={filteredTasks} onOpenTask={handleOpenTaskModal} onDataNeedsRefresh={handleDataNeedsRefresh} />;
             case 'list':
             default:
-                return <TaskGrid tasks={filteredTasks} customFields={customFields} fieldOptions={fieldOptions} onOpenTask={handleOpenTaskModal} onTaskUpdate={handleTaskUpdated} allUsers={workspaceMembers} />;
+                return <TaskGrid 
+                    tasks={filteredTasks} 
+                    customFields={customFields} 
+                    fieldOptions={fieldOptions} 
+                    onOpenTask={handleOpenTaskModal} 
+                    onTaskUpdate={handleTaskUpdated} 
+                    allUsers={workspaceMembers}
+                    onTasksReorder={handleTasksReorder} 
+                />;
         }
     };
     

@@ -1,3 +1,4 @@
+// client/src/components/TaskModal.tsx
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { createTask, updateTask, getAttachments, uploadAttachment, deleteAttachment, getFieldOptions, getComments, createComment, API_URL } from '../services/api';
 import type { Task, CustomField, User, FieldOption } from '../types';
@@ -17,7 +18,6 @@ interface TaskModalProps {
     parentId?: string; workspaceMembers: User[]; allWorkspaceTasks: Task[];
 }
 
-// --- INICIO DE MEJORA: Componente para previsualización de archivos ---
 const AttachmentPreview: React.FC<{ attachment: Attachment; onDelete: (id: string) => void }> = ({ attachment, onDelete }) => {
     const fileExtension = attachment.fileName.split('.').pop()?.toLowerCase() || '';
     const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileExtension);
@@ -39,8 +39,6 @@ const AttachmentPreview: React.FC<{ attachment: Attachment; onDelete: (id: strin
         </div>
     );
 };
-// --- FIN DE MEJORA ---
-
 
 const MultiSelectDropdown: React.FC<{ options: FieldOption[]; selectedIds: string[]; onChange: (selectedIds: string[]) => void;}> = ({ options, selectedIds, onChange }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -187,7 +185,6 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
                     </div>
                     <div className="p-6 flex-grow overflow-y-auto space-y-6">
                         <label className="block text-sm font-medium text-foreground-secondary ">Descripción</label>
-                        {/* Tu RichTextEditor ya soporta contenido enriquecido. Asegúrate que su configuración interna permita pegar imágenes. */}
                         <RichTextEditor content={description} onChange={setDescription} placeholder="Añade una descripción..." />
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -203,8 +200,6 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
                         
                         {customFields.map(field => {
                             const currentValue = customFieldValues[field.id] || {};
-
-                            // --- INICIO DE MEJORA: Soporte para campo de texto ---
                             if (field.type === 'text') {
                                 return (
                                     <div key={field.id}>
@@ -218,8 +213,6 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
                                     </div>
                                 )
                             }
-                            // --- FIN DE MEJORA ---
-                            
                             if (field.type === 'dropdown') {
                                 return (
                                     <div key={field.id}>
@@ -254,13 +247,11 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
                         
                         <div>
                             <label className="block text-sm font-medium text-foreground-secondary">Archivos Adjuntos</label>
-                            {/* --- INICIO DE MEJORA: Bucle de previsualización --- */}
                             <div className="mt-2 space-y-2">
                                 {Array.isArray(attachments) && attachments.map(att => (
                                     <AttachmentPreview key={att.id} attachment={att} onDelete={handleDeleteAttachment} />
                                 ))}
                             </div>
-                            {/* --- FIN DE MEJORA --- */}
                             <div className="mt-2">
                                 <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} disabled={!isEditMode || isUploading} />
                                 <button type="button" onClick={() => fileInputRef.current?.click()} disabled={!isEditMode || isUploading} className={`text-sm font-semibold text-blue-600 hover:text-blue-800 ${!isEditMode ? 'opacity-50 cursor-not-allowed' : ''}`}>
