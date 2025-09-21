@@ -30,7 +30,6 @@ interface DescriptionEditorProps {
 }
 const DescriptionEditor: React.FC<DescriptionEditorProps> = ({ content, onSave, onClose }) => {
     const editorRef = useRef<HTMLDivElement>(null);
-    // --- SOLUCIÓN: Si el contenido es <p></p>, trátalo como vacío ---
     const initialText = content === '<p></p>' ? '' : content || '';
     const [text, setText] = useState(initialText);
 
@@ -42,12 +41,13 @@ const DescriptionEditor: React.FC<DescriptionEditorProps> = ({ content, onSave, 
     };
 
     return (
-        <div className="absolute z-30 mt-2 p-3 bg-card border border-border rounded shadow-lg w-80" ref={editorRef}>
+        // --- SOLUCIÓN: Editor más grande y con más margen superior ---
+        <div className="absolute z-30 mt-2 p-3 bg-card border border-border rounded shadow-lg w-[450px]" ref={editorRef}>
             <h4 className="font-bold mb-2 text-sm">Editar Descripción</h4>
             <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                className="w-full h-32 p-2 border border-border-color rounded bg-background-primary text-foreground-primary text-sm"
+                className="w-full h-48 p-2 border border-border-color rounded bg-background-primary text-foreground-primary text-sm"
                 autoFocus
             />
             <div className="flex justify-end mt-2">
@@ -132,6 +132,7 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, gridTemplateColumns, cells, cus
 
         if (fieldId === 'dueDate') { 
             return (
+                // --- SOLUCIÓN: Corrección del error de TS y posicionamiento con CSS ---
                 <DatePicker 
                     selected={task.dueDate ? new Date(task.dueDate.replace(/-/g, '/')) : null} 
                     onChange={(date) => { 
@@ -139,7 +140,8 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, gridTemplateColumns, cells, cus
                         setEditingCell(null); 
                     }} 
                     popperPlacement="bottom-start"
-                    inline 
+                    inline
+                    popperClassName="datepicker-popper-offset" // Clase CSS para bajar el pop-up
                 />
             );
         }
@@ -157,7 +159,6 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, gridTemplateColumns, cells, cus
                                     ? currentAssignees.filter(a => a.id !== user.id)
                                     : [...currentAssignees, { id: user.id, name: user.name }];
                                 handleTaskUpdate({ assignees: newAssignees });
-                                setEditingCell(null);
                             }} className="px-3 py-2 hover:bg-background-secondary flex items-center justify-between cursor-pointer">
                                 <div className="flex items-center"><Avatar name={user.name} /><span className="ml-2 text-sm">{user.name}</span></div>
                                 <div className={`w-3 h-3 rounded-full ${isAssigned ? 'bg-green-500' : 'bg-red-500'}`} />
@@ -187,15 +188,17 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, gridTemplateColumns, cells, cus
                                     const newOptionId = isSelected ? null : opt.id;
                                     const newValue = isSelected ? null : opt.value;
                                     cfVal = { ...existingValue, optionId: newOptionId, value: newValue };
+                                    setEditingCell(null);
                                 }
                                 handleTaskUpdate({ customFields: { [field.id]: cfVal } });
-                                setEditingCell(null);
-                            }} className="px-3 py-2 hover:bg-background-secondary flex items-center justify-between cursor-pointer">
-                                <div className="flex items-center gap-2">
-                                    <div className={`w-3 h-3 rounded-full ${isSelected ? 'bg-green-500' : 'bg-red-500'}`} />
+                            }} className="flex items-center justify-between cursor-pointer">
+                                {/* --- SOLUCIÓN: Quitar checklist y puntos para dropdowns --- */}
+                                <div className="px-3 py-2 hover:bg-background-secondary w-full flex items-center justify-between">
                                     <Tag text={opt.value} color={opt.color} />
+                                    {field.type === 'labels' && (
+                                         <input type="checkbox" readOnly checked={!!isSelected} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"/>
+                                    )}
                                 </div>
-                                {field.type === 'labels' && <input type="checkbox" readOnly checked={!!isSelected}/>}
                             </li>
                         );
                     })}
@@ -210,7 +213,7 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, gridTemplateColumns, cells, cus
             <div className="grid items-center border-b border-border hover:bg-background-secondary group" style={{ gridTemplateColumns }}>
                 {cells.map(cell => (
                     <div key={cell.id} className="px-6 py-2 relative flex items-center h-full">
-                        <div className="cursor-pointer w-full h-full" onClick={(e) => {
+                        <div className="cursor-pointer w-full h-full flex items-center" onClick={(e) => {
                             if (cell.column.id === 'description') {
                                 e.stopPropagation();
                                 setIsDescEditorOpen(true);

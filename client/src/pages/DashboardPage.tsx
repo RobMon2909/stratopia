@@ -1,11 +1,11 @@
 // client/src/pages/DashboardPage.tsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-    getWorkspaces, createWorkspace, getWorkspaceLists, getCustomFields, 
-    getFieldOptions, getWorkspaceMembers, searchTasks, 
+import {
+    getWorkspaces, createWorkspace, getWorkspaceLists, getCustomFields,
+    getFieldOptions, getWorkspaceMembers, searchTasks,
     getNotifications, markNotificationsAsRead,
-    updateTask 
+    updateTask
 } from '@/services/api';
 import socketService from '@/services/socketService';
 import NotificationsPanel from '@/components/NotificationsPanel';
@@ -51,7 +51,7 @@ const DashboardPage: React.FC = () => {
     const [groupBy, setGroupBy] = useState<GroupByOption>('default');
     const [hideDoneTasks, setHideDoneTasks] = useState<boolean>(() => {
         const savedPreference = localStorage.getItem('hideDoneTasks');
-        return savedPreference === 'true'; 
+        return savedPreference === 'true';
     });
 
     useEffect(() => { localStorage.setItem('hideDoneTasks', String(hideDoneTasks)); }, [hideDoneTasks]);
@@ -81,7 +81,7 @@ const DashboardPage: React.FC = () => {
                 });
                 setFieldOptions(optionsMap);
             }
-        } catch (error) { console.error("Failed to fetch workspace data", error); } 
+        } catch (error) { console.error("Failed to fetch workspace data", error); }
         finally { setLoadingData(false); }
     }, [activeWorkspace, groupBy]);
 
@@ -128,14 +128,14 @@ const DashboardPage: React.FC = () => {
         });
         return () => { socketService.disconnect(); };
     }, [user, activeWorkspace, fetchDataForWorkspace]);
-    
+
     const handleToggleNotifications = () => {
         setIsNotificationsOpen(prev => !prev);
         if (unreadCount > 0 && !isNotificationsOpen) {
             markNotificationsAsRead().then(() => setNotifications(prev => prev.map(n => ({ ...n, isRead: 1 })))).catch(err => console.error("Failed to mark notifications as read", err));
         }
     };
-    
+
     const handleCreateWorkspace = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newWorkspaceName.trim()) return;
@@ -145,10 +145,10 @@ const DashboardPage: React.FC = () => {
             setWorkspaces(current => [...current, res.data.workspace]);
             setActiveWorkspace(res.data.workspace);
             setIsWorkspaceModalOpen(false); setNewWorkspaceName("");
-        } catch (err: any) { alert(err.response?.data?.message || "Error al crear."); } 
+        } catch (err: any) { alert(err.response?.data?.message || "Error al crear."); }
         finally { setIsSubmittingWorkspace(false); }
     };
-    
+
     const handleOpenTaskModal = (task: Task | NestedTask | null, listId: string, parentId?: string) => {
         setSelectedTask(task as Task | null);
         if (!task) {
@@ -157,7 +157,7 @@ const DashboardPage: React.FC = () => {
         }
         setIsTaskModalOpen(true);
     };
-    
+
     const handleNotificationClick = (taskId: string) => {
         const taskToOpen = allTasks.find(task => task.id === taskId);
         if (taskToOpen) {
@@ -167,16 +167,14 @@ const DashboardPage: React.FC = () => {
             alert("La tarea no se encontró en el espacio de trabajo actual.");
         }
     };
-    
+
     const handleCloseTaskModal = () => {
         setIsTaskModalOpen(false); setSelectedTask(null); setListIdForNewTask(null); setParentIdForNewTask(undefined);
     };
-    
+
     const handleDataNeedsRefresh = () => { fetchDataForWorkspace(); };
-    
+
     const handleTaskUpdated = (updatedTaskData: Partial<Task> & { id: string }) => {
-        // --- SOLUCIÓN: Lógica de actualización no-destructiva ---
-        // 1. Actualización visual optimista (el usuario ve el cambio al instante)
         setLists(currentLists =>
             currentLists.map(list => ({
                 ...list,
@@ -185,7 +183,7 @@ const DashboardPage: React.FC = () => {
                         const newCustomFields = updatedTaskData.customFields
                             ? { ...task.customFields, ...updatedTaskData.customFields }
                             : task.customFields;
-                        
+
                         return { ...task, ...updatedTaskData, customFields: newCustomFields };
                     }
                     return task;
@@ -193,41 +191,41 @@ const DashboardPage: React.FC = () => {
             }))
         );
 
-        // 2. Construye el payload para la API SÓLO con los datos que cambiaron
         const { id, customFields: cfObject, assignees, ...restOfTaskData } = updatedTaskData;
 
-        const customFieldsPayload = cfObject 
-            ? Object.entries(cfObject).map(([fieldId, data]) => ({ fieldId, ...data }))
+        const customFieldsPayload = cfObject
+            ? Object.entries(cfObject).map(([fieldId, data]) => {
+                const fieldType = customFields.find(f => f.id === fieldId)?.type;
+                return { fieldId, ...data, type: fieldType };
+              })
             : undefined;
 
         const assigneeIdsPayload = assignees ? assignees.map(a => a.id) : undefined;
-        
-        const payload: any = { // Se usa 'any' temporalmente para poder modificar description
+
+        const payload: any = {
             taskId: id,
             ...restOfTaskData,
             customFields: customFieldsPayload,
             assigneeIds: assigneeIdsPayload,
         };
 
-        // --- SOLUCIÓN: Corrige el error de TypeScript `string | null` vs `string | undefined` ---
         if ('description' in payload) {
             payload.description = payload.description ?? undefined;
         }
 
-        // 3. Llamada a la API con el payload parcial y correcto
         updateTask(payload).catch(error => {
             console.error("Falló la actualización de la tarea:", error.response?.data || error);
             alert("Error al guardar el cambio. Se revertirá la acción.");
             fetchDataForWorkspace();
         });
     };
-    
+
     const handleFilterChange = (filterName: string, value: string) => { setActiveFilters(prev => ({ ...prev, [filterName]: value })); };
-    
+
     const tasksToDisplay = searchResults !== null ? searchResults : allTasks;
     const statusField = useMemo(() => customFields.find(f => f.name.toLowerCase() === 'estado'), [customFields]);
     const statusOptions = useMemo(() => (statusField ? [...(fieldOptions[statusField.id] || [])].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)) : []), [statusField, fieldOptions]);
-    
+
     const filteredTasks = useMemo(() => {
         if (!Array.isArray(tasksToDisplay)) return [];
         let tasksToProcess = tasksToDisplay.filter(task => {
@@ -275,18 +273,18 @@ const DashboardPage: React.FC = () => {
                 return <CalendarView tasks={filteredTasks} onOpenTask={handleOpenTaskModal} onDataNeedsRefresh={handleDataNeedsRefresh} />;
             case 'list':
             default:
-                return <TaskGrid 
-                    tasks={filteredTasks} 
-                    customFields={customFields} 
-                    fieldOptions={fieldOptions} 
-                    onOpenTask={handleOpenTaskModal} 
-                    onTaskUpdate={handleTaskUpdated} 
+                return <TaskGrid
+                    tasks={filteredTasks}
+                    customFields={customFields}
+                    fieldOptions={fieldOptions}
+                    onOpenTask={handleOpenTaskModal}
+                    onTaskUpdate={handleTaskUpdated}
                     allUsers={workspaceMembers}
-                    onTasksReorder={handleTasksReorder} 
+                    onTasksReorder={handleTasksReorder}
                 />;
         }
     };
-    
+
     if (loadingWorkspaces) { return <div className="flex justify-center items-center h-screen">Cargando...</div>; }
 
     return (

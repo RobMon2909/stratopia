@@ -14,7 +14,7 @@ interface Attachment { id: string; fileName: string; filePath: string; }
 interface Comment { id: string; content: string; createdAt: string; userId: string; userName: string; }
 interface TaskModalProps {
     isOpen: boolean; onClose: () => void; listId: string | null | undefined; taskToEdit: Task | null;
-    onTaskCreated: (newTask: Task) => void; onDataNeedsRefresh: () => void; customFields: CustomField[]; 
+    onTaskCreated: (newTask: Task) => void; onDataNeedsRefresh: () => void; customFields: CustomField[];
     parentId?: string; workspaceMembers: User[]; allWorkspaceTasks: Task[];
 }
 
@@ -72,27 +72,37 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
     const isEditMode = taskToEdit !== null;
 
     useEffect(() => {
-        if (isOpen) {
-            setError(''); setAttachments([]); setComments([]);
-            if (isEditMode && taskToEdit) {
-                setTitle(taskToEdit.title); 
-                setDescription(taskToEdit.description || '');
-                setDueDate(taskToEdit.dueDate ? taskToEdit.dueDate.split(' ')[0] : '');
-                setAssigneeIds(taskToEdit.assignees ? taskToEdit.assignees.map(a => a.id) : []);
-                setCustomFieldValues(taskToEdit.customFields || {});
-                getAttachments(taskToEdit.id).then(res => setAttachments(res.data));
-                getComments(taskToEdit.id).then(res => setComments(res.data));
-            } else {
-                setTitle(''); setDescription(''); setDueDate(''); setAssigneeIds([]); setCustomFieldValues({});
-            }
-            const optionsToFetch = customFields.filter(f => f.type === 'dropdown' || f.type === 'labels');
-            if (optionsToFetch.length > 0) {
-                Promise.all(optionsToFetch.map(field => getFieldOptions(field.id))).then(results => {
-                    const optionsMap: { [fieldId: string]: FieldOption[] } = {};
-                    optionsToFetch.forEach((field, index) => { optionsMap[field.id] = results[index].data; });
-                    setFieldOptions(optionsMap);
-                });
-            } else { setFieldOptions({}); }
+        if (!isOpen) return;
+
+        setError('');
+
+        if (isEditMode && taskToEdit) {
+            setTitle(taskToEdit.title);
+            setDescription(taskToEdit.description || '');
+            setDueDate(taskToEdit.dueDate ? taskToEdit.dueDate.split(' ')[0] : '');
+            setAssigneeIds(taskToEdit.assignees ? taskToEdit.assignees.map(a => a.id) : []);
+            setCustomFieldValues(taskToEdit.customFields || {});
+            getAttachments(taskToEdit.id).then(res => setAttachments(res.data));
+            getComments(taskToEdit.id).then(res => setComments(res.data));
+        } else if (!isEditMode) {
+            setTitle('');
+            setDescription('');
+            setDueDate('');
+            setAssigneeIds([]);
+            setCustomFieldValues({});
+            setAttachments([]);
+            setComments([]);
+        }
+
+        const optionsToFetch = customFields.filter(f => f.type === 'dropdown' || f.type === 'labels');
+        if (optionsToFetch.length > 0) {
+            Promise.all(optionsToFetch.map(field => getFieldOptions(field.id))).then(results => {
+                const optionsMap: { [fieldId: string]: FieldOption[] } = {};
+                optionsToFetch.forEach((field, index) => { optionsMap[field.id] = results[index].data; });
+                setFieldOptions(optionsMap);
+            });
+        } else {
+            setFieldOptions({});
         }
     }, [isOpen, taskToEdit, isEditMode, customFields]);
 
@@ -110,7 +120,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
     }, [fieldOptions, isOpen, isEditMode, customFields, customFieldValues]);
 
     const handleDependencyUpdate = () => { onDataNeedsRefresh(); alert("Dependencia guardada. La verás reflejada al refrescar o reabrir la tarea."); };
-    
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!title.trim()) { setError("El título es requerido."); return; }
@@ -123,7 +133,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
             if (isEditMode && taskToEdit) {
                 const taskData = { taskId: taskToEdit.id, title, description, dueDate: dueDate || null, assigneeIds, customFields: cfPayload };
                 await updateTask(taskData);
-                onDataNeedsRefresh(); 
+                onDataNeedsRefresh();
             } else {
                 if (!listId) { setError("No se ha especificado una lista."); setIsSubmitting(false); return; }
                 const taskData = { title, description, dueDate: dueDate || null, listId, parentId, assigneeIds, customFields: cfPayload };
@@ -131,7 +141,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
                 if (res.data.task) { onTaskCreated(res.data.task); } else { onDataNeedsRefresh(); }
             }
             onClose();
-        } catch (err: any) { setError(err.response?.data?.message || "Ocurrió un error."); } 
+        } catch (err: any) { setError(err.response?.data?.message || "Ocurrió un error."); }
         finally { setIsSubmitting(false); }
     };
 
@@ -147,7 +157,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
             try {
                 const res = await uploadAttachment(taskToEdit.id, file);
                 setAttachments(prev => [...prev, res.data.attachment]);
-            } catch (error) { alert('Error al subir el archivo.'); } 
+            } catch (error) { alert('Error al subir el archivo.'); }
             finally { setIsUploading(false); event.target.value = ''; }
         } else if (!isEditMode) { alert("Debes guardar la tarea por primera vez para poder adjuntar archivos."); }
     };
@@ -160,7 +170,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
             } catch (error) { alert('Error al eliminar el archivo.'); }
         }
     };
-    
+
     const handlePostComment = async (commentContent: string) => {
         const isCommentEmpty = !commentContent || commentContent.trim() === '' || commentContent.trim() === '<p></p>';
         if (!taskToEdit || isCommentEmpty) { return; }
@@ -185,26 +195,31 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
                     </div>
                     <div className="p-6 flex-grow overflow-y-auto space-y-6">
                         <label className="block text-sm font-medium text-foreground-secondary ">Descripción</label>
-                        <RichTextEditor content={description} onChange={setDescription} placeholder="Añade una descripción..." />
-                        
+                        <RichTextEditor
+                            key={taskToEdit?.id || 'new-task-editor'}
+                            content={description}
+                            onChange={setDescription}
+                            placeholder="Añade una descripción..."
+                        />
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div> 
-                                <label className="block text-sm font-medium text-foreground-secondary">Fecha Límite</label> 
-                                <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="mt-1 p-2 border border-border rounded-md w-full bg-input text-foreground" /> 
+                            <div>
+                                <label className="block text-sm font-medium text-foreground-secondary">Fecha Límite</label>
+                                <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="mt-1 p-2 border border-border rounded-md w-full bg-input text-foreground" />
                             </div>
-                            <div> 
-                                <label className="block text-sm font-medium text-foreground-secondary">Personas Asignadas</label> 
-                                <MultiSelectDropdown options={workspaceMembers.map(m => ({ id: m.id, value: m.name, color: '#e5e7eb' }))} selectedIds={assigneeIds} onChange={setAssigneeIds} /> 
+                            <div>
+                                <label className="block text-sm font-medium text-foreground-secondary">Personas Asignadas</label>
+                                <MultiSelectDropdown options={workspaceMembers.map(m => ({ id: m.id, value: m.name, color: '#e5e7eb' }))} selectedIds={assigneeIds} onChange={setAssigneeIds} />
                             </div>
                         </div>
-                        
+
                         {customFields.map(field => {
                             const currentValue = customFieldValues[field.id] || {};
                             if (field.type === 'text') {
                                 return (
                                     <div key={field.id}>
                                         <label className="block text-sm font-medium text-foreground-secondary">{field.name}</label>
-                                        <input 
+                                        <input
                                             type="text"
                                             value={currentValue.value || ''}
                                             onChange={(e) => handleCustomFieldChange(field.id, e.target.value)}
@@ -217,9 +232,9 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
                                 return (
                                     <div key={field.id}>
                                         <label className="block text-sm font-medium text-foreground-secondary">{field.name}</label>
-                                        <select 
-                                            value={currentValue.optionId || ''} 
-                                            onChange={(e) => handleCustomFieldChange(field.id, e.target.options[e.target.selectedIndex].text, e.target.value)} 
+                                        <select
+                                            value={currentValue.optionId || ''}
+                                            onChange={(e) => handleCustomFieldChange(field.id, e.target.options[e.target.selectedIndex].text, e.target.value)}
                                             className="mt-1 p-2 border border-border rounded-md w-full bg-input text-foreground"
                                         >
                                             <option value="">-- Sin seleccionar --</option>
@@ -228,23 +243,23 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
                                             ))}
                                         </select>
                                     </div>
-                                );                            
+                                );
                             }
                             if (field.type === 'labels') {
                                 return (
                                     <div key={field.id}>
                                         <label className="block text-sm font-medium text-foreground-secondary">{field.name}</label>
-                                        <MultiSelectDropdown 
-                                            options={fieldOptions[field.id] || []} 
-                                            selectedIds={currentValue.optionIds || []} 
-                                            onChange={(selectedIds) => handleCustomFieldChange(field.id, null, null, true, selectedIds)} 
+                                        <MultiSelectDropdown
+                                            options={fieldOptions[field.id] || []}
+                                            selectedIds={currentValue.optionIds || []}
+                                            onChange={(selectedIds) => handleCustomFieldChange(field.id, null, null, true, selectedIds)}
                                         />
                                     </div>
                                 );
                             }
                             return null;
                         })}
-                        
+
                         <div>
                             <label className="block text-sm font-medium text-foreground-secondary">Archivos Adjuntos</label>
                             <div className="mt-2 space-y-2">
@@ -262,7 +277,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
                         </div>
 
                         {isEditMode && taskToEdit && <TaskDependencies task={taskToEdit} allTasks={allWorkspaceTasks} onUpdate={handleDependencyUpdate} />}
-                        
+
                         {isEditMode && taskToEdit && (
                             <div className="mt-6 pt-4 border-t border-border">
                                 <h3 className="text-lg font-semibold mb-3">Comentarios</h3>
@@ -283,7 +298,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
                                 <CommentEditor members={workspaceMembers} onPost={handlePostComment} />
                             </div>
                         )}
-                        
+
                         {error && <p className="text-red-500 mt-4">{error}</p>}
                     </div>
                     <div className="p-4 border-t border-border bg-background-secondary flex justify-end flex-shrink-0">
@@ -304,7 +319,7 @@ const CommentEditor: React.FC<{ members: User[]; onPost: (content: string) => vo
                 HTMLAttributes: { class: 'mention' },
                 suggestion: {
                     items: ({ query }) => {
-                        return members.filter(member => 
+                        return members.filter(member =>
                             member.name.toLowerCase().startsWith(query.toLowerCase())
                         ).slice(0, 5);
                     },

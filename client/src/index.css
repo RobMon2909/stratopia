@@ -68,3 +68,8 @@
 .ProseMirror strong {
   color: hsl(var(--text-primary)) !important;
 }
+
+.datepicker-popper-offset {
+    margin-top: 10px !important; 
+    z-index: 30 !important; /* Asegura que se muestre por encima de otros elementos */
+}

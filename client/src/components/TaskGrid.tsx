@@ -59,21 +59,36 @@ const TaskGrid: React.FC<TaskGridProps> = ({ tasks, customFields, fieldOptions, 
 
     const columnIds = useMemo(() => columns.map(c => c.id!), [columns]);
 
-    const [columnOrder, setColumnOrder] = useState<string[]>(() => {
-        const savedOrder = localStorage.getItem('taskGridColumnOrder');
-        if (savedOrder) {
-            return JSON.parse(savedOrder);
-        }
-        return columnIds;
-    });
+    const [columnOrder, setColumnOrder] = useState<string[]>([]);
+
+    // --- SOLUCIÓN: Sincronizar el orden de las columnas con un useEffect ---
+    useEffect(() => {
+        const savedOrderJSON = localStorage.getItem('taskGridColumnOrder');
+        const savedOrder = savedOrderJSON ? JSON.parse(savedOrderJSON) : [];
+        const currentColumnIdsSet = new Set(columnIds);
+
+        const validSavedOrder = savedOrder.filter((id: string) => currentColumnIdsSet.has(id));
+        const savedOrderSet = new Set(validSavedOrder);
+        const newColumns = columnIds.filter(id => !savedOrderSet.has(id));
+
+        setColumnOrder([...validSavedOrder, ...newColumns]);
+    }, [columnIds]);
+    // --- Fin de la solución ---
 
     const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => {
         const savedSizing = localStorage.getItem('taskGridColumnSizing');
         return savedSizing ? JSON.parse(savedSizing) : {};
     });
 
-    useEffect(() => { localStorage.setItem('taskGridColumnOrder', JSON.stringify(columnOrder)); }, [columnOrder]);
-    useEffect(() => { localStorage.setItem('taskGridColumnSizing', JSON.stringify(columnSizing)); }, [columnSizing]);
+    useEffect(() => {
+        if (columnOrder.length) {
+            localStorage.setItem('taskGridColumnOrder', JSON.stringify(columnOrder));
+        }
+    }, [columnOrder]);
+
+    useEffect(() => { 
+        localStorage.setItem('taskGridColumnSizing', JSON.stringify(columnSizing)); 
+    }, [columnSizing]);
     
     const table = useReactTable({
         data: nestedTasks,
@@ -123,8 +138,8 @@ const TaskGrid: React.FC<TaskGridProps> = ({ tasks, customFields, fieldOptions, 
                         <Droppable droppableId="droppable-headers" direction="horizontal">
                             {(provided) => (
                                 <div className="flex" ref={provided.innerRef} {...provided.droppableProps}>
-                                    {headerGroup.headers.map(header => (
-                                        <Draggable key={header.id} draggableId={header.id} index={header.index}>
+                                    {headerGroup.headers.map((header, index) => (
+                                        <Draggable key={header.id} draggableId={header.id} index={index}>
                                             {(provided) => (
                                                 <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}>
                                                     <DraggableHeader header={header} />
