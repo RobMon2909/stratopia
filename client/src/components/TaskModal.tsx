@@ -71,40 +71,44 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, listId, taskToEd
     const [fieldOptions, setFieldOptions] = useState<{ [fieldId: string]: FieldOption[] }>({});
     const isEditMode = taskToEdit !== null;
 
+    // --- SOLUCIÓN: useEffect simplificado para evitar estado añejo (stale state) ---
     useEffect(() => {
-        if (!isOpen) return;
+        if (isOpen) {
+            setError('');
 
-        setError('');
+            // Si hay una tarea para editar, llena el formulario con sus datos
+            if (taskToEdit) {
+                setTitle(taskToEdit.title);
+                setDescription(taskToEdit.description || '');
+                setDueDate(taskToEdit.dueDate ? taskToEdit.dueDate.split(' ')[0] : '');
+                setAssigneeIds(taskToEdit.assignees ? taskToEdit.assignees.map(a => a.id) : []);
+                setCustomFieldValues(taskToEdit.customFields || {});
+                getAttachments(taskToEdit.id).then(res => setAttachments(res.data));
+                getComments(taskToEdit.id).then(res => setComments(res.data));
+            } else {
+            // Si no (es una tarea nueva), resetea todos los campos
+                setTitle('');
+                setDescription('');
+                setDueDate('');
+                setAssigneeIds([]);
+                setCustomFieldValues({});
+                setAttachments([]);
+                setComments([]);
+            }
 
-        if (isEditMode && taskToEdit) {
-            setTitle(taskToEdit.title);
-            setDescription(taskToEdit.description || '');
-            setDueDate(taskToEdit.dueDate ? taskToEdit.dueDate.split(' ')[0] : '');
-            setAssigneeIds(taskToEdit.assignees ? taskToEdit.assignees.map(a => a.id) : []);
-            setCustomFieldValues(taskToEdit.customFields || {});
-            getAttachments(taskToEdit.id).then(res => setAttachments(res.data));
-            getComments(taskToEdit.id).then(res => setComments(res.data));
-        } else if (!isEditMode) {
-            setTitle('');
-            setDescription('');
-            setDueDate('');
-            setAssigneeIds([]);
-            setCustomFieldValues({});
-            setAttachments([]);
-            setComments([]);
+            // La carga de opciones se mantiene igual
+            const optionsToFetch = customFields.filter(f => f.type === 'dropdown' || f.type === 'labels');
+            if (optionsToFetch.length > 0) {
+                Promise.all(optionsToFetch.map(field => getFieldOptions(field.id))).then(results => {
+                    const optionsMap: { [fieldId: string]: FieldOption[] } = {};
+                    optionsToFetch.forEach((field, index) => { optionsMap[field.id] = results[index].data; });
+                    setFieldOptions(optionsMap);
+                });
+            } else {
+                setFieldOptions({});
+            }
         }
-
-        const optionsToFetch = customFields.filter(f => f.type === 'dropdown' || f.type === 'labels');
-        if (optionsToFetch.length > 0) {
-            Promise.all(optionsToFetch.map(field => getFieldOptions(field.id))).then(results => {
-                const optionsMap: { [fieldId: string]: FieldOption[] } = {};
-                optionsToFetch.forEach((field, index) => { optionsMap[field.id] = results[index].data; });
-                setFieldOptions(optionsMap);
-            });
-        } else {
-            setFieldOptions({});
-        }
-    }, [isOpen, taskToEdit, isEditMode, customFields]);
+    }, [isOpen, taskToEdit]); // La dependencia clave es `taskToEdit` para que se refresque al cambiar de tarea
 
     useEffect(() => {
         if (isOpen && !isEditMode && Object.keys(fieldOptions).length > 0) {

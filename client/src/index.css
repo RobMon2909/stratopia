@@ -1,4 +1,6 @@
-/* 1. Directivas de Tailwind (RESTAURA ESTILOS BASE Y UTILIDADES) */
+/* client/src/index.css */
+
+/* 1. Directivas de Tailwind */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -69,7 +71,8 @@
   color: hsl(var(--text-primary)) !important;
 }
 
-.datepicker-popper-offset {
-    margin-top: 10px !important; 
-    z-index: 30 !important; /* Asegura que se muestre por encima de otros elementos */
+.react-datepicker-popper {
+    margin-top: 15px !important; /* Aumenta este valor si quieres bajarlo aún más */
+    z-index: 50 !important;      /* Un z-index alto para que aparezca por encima de todo */
 }
+/* La llave extra al final ha sido eliminada */

@@ -1,8 +1,10 @@
 // client/src/components/RichTextEditor.tsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Image from '@tiptap/extension-image'; // --- NUEVO: Importar la extensión de imagen ---
+import Image from '@tiptap/extension-image';
+// --- SOLUCIÓN: Importar la extensión Placeholder ---
+import Placeholder from '@tiptap/extension-placeholder';
 
 // --- SUB-COMPONENTE: BARRA DE HERRAMIENTAS ---
 const MenuBar: React.FC<{ editor: Editor | null }> = ({ editor }) => {
@@ -13,7 +15,6 @@ const MenuBar: React.FC<{ editor: Editor | null }> = ({ editor }) => {
   const buttonClass = "px-2 py-1 text-sm rounded-md hover:bg-muted hover:text-muted-foreground";
   const activeButtonClass = "bg-muted text-muted-foreground";
 
-  // --- NUEVO: Función para añadir imagen por URL ---
   const addImage = () => {
     const url = window.prompt('URL de la imagen');
     if (url) {
@@ -44,7 +45,6 @@ const MenuBar: React.FC<{ editor: Editor | null }> = ({ editor }) => {
       >
         Tachado
       </button>
-      {/* --- NUEVO: Botón para añadir imagen --- */}
       <button type="button" onClick={addImage} className={buttonClass}>
         Imagen
       </button>
@@ -77,13 +77,18 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, plac
   const editor = useEditor({
     extensions: [
       StarterKit,
-      Image, // --- NUEVO: Añadir la extensión a Tiptap ---
+      Image,
+      // --- SOLUCIÓN: Configurar el placeholder a través de la extensión ---
+      Placeholder.configure({
+        placeholder: placeholder || 'Escribe algo...',
+      }),
     ],
     content: content,
     editorProps: {
       attributes: {
         class: 'prose dark:prose-invert max-w-none p-3 min-h-[150px] focus:outline-none',
       },
+      // El atributo 'data-placeholder' se elimina de aquí
     },
     onUpdate({ editor }) {
       const isContentEmpty = editor.getText().trim().length === 0;
@@ -91,17 +96,20 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, plac
     },
   });
 
+  useEffect(() => {
+    if (editor) {
+      const isSame = editor.getHTML() === content;
+      if (!isSame) {
+        // --- SOLUCIÓN: Usar un objeto para el segundo argumento de setContent ---
+        editor.commands.setContent(content, { emitUpdate: false });
+      }
+    }
+  }, [content, editor]);
+
   return (
     <div className="bg-card border border-border rounded-lg overflow-hidden">
       <MenuBar editor={editor} />
-      {/* Con la extensión 'Image' activa, Tiptap manejará automáticamente
-        el pegado de imágenes desde el portapapeles y el arrastrar y soltar.
-        Nota: Esto insertará la imagen como datos base64. Para una solución
-        más robusta, se necesitaría interceptar el evento de pegado, subir
-        la imagen a tu servidor y luego insertar la URL resultante.
-        Pero para empezar, esto es funcional.
-      */}
-      <EditorContent editor={editor} placeholder={placeholder} />
+      <EditorContent editor={editor} />
     </div>
   );
 };

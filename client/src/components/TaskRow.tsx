@@ -6,7 +6,10 @@ import Tag from './ui/Tag.tsx';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { Cell } from '@tanstack/react-table';
-import { FaAlignLeft } from 'react-icons/fa';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+// --- SOLUCIÓN: Importar la extensión de Imagen ---
+import Image from '@tiptap/extension-image';
 
 const useClickOutside = (ref: React.RefObject<any>, handler: () => void) => {
     useEffect(() => {
@@ -28,28 +31,45 @@ interface DescriptionEditorProps {
     onSave: (newContent: string) => void;
     onClose: () => void;
 }
+
 const DescriptionEditor: React.FC<DescriptionEditorProps> = ({ content, onSave, onClose }) => {
     const editorRef = useRef<HTMLDivElement>(null);
-    const initialText = content === '<p></p>' ? '' : content || '';
-    const [text, setText] = useState(initialText);
 
-    useClickOutside(editorRef, onClose);
+    const editor = useEditor({
+        // --- SOLUCIÓN: Añadir la extensión de Imagen al editor ---
+        extensions: [StarterKit, Image],
+        content: content || '',
+        editorProps: {
+            attributes: {
+                class: 'prose dark:prose-invert max-w-none p-2 min-h-[120px] focus:outline-none border border-border rounded bg-input text-foreground',
+            },
+        },
+    });
+
+    useClickOutside(editorRef, () => {
+        if (editor) {
+            onSave(editor.getHTML());
+        }
+        onClose();
+    });
 
     const handleSave = () => {
-        onSave(text);
+        if (editor) {
+            onSave(editor.getHTML());
+        }
         onClose();
     };
 
+    useEffect(() => {
+        if (editor) {
+            editor.commands.focus('end');
+        }
+    }, [editor]);
+
     return (
-        // --- SOLUCIÓN: Editor más grande y con más margen superior ---
         <div className="absolute z-30 mt-2 p-3 bg-card border border-border rounded shadow-lg w-[450px]" ref={editorRef}>
             <h4 className="font-bold mb-2 text-sm">Editar Descripción</h4>
-            <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                className="w-full h-48 p-2 border border-border-color rounded bg-background-primary text-foreground-primary text-sm"
-                autoFocus
-            />
+            <EditorContent editor={editor} />
             <div className="flex justify-end mt-2">
                 <button 
                     onClick={handleSave}
@@ -105,7 +125,20 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, gridTemplateColumns, cells, cus
                         <span className="truncate max-w-xs">{task.title}</span>
                     </div>
         }
-        if (fieldId === 'description') { return task.description && task.description !== '<p></p>' ? <FaAlignLeft className="text-gray-400" /> : <span className="text-gray-400">-</span>; }
+        
+        if (fieldId === 'description') {
+            const hasContent = task.description && task.description !== '<p></p>';
+            if (!hasContent) {
+                return <span className="text-gray-400">-</span>;
+            }
+            return (
+                 <div 
+                    className="prose prose-sm max-w-none text-foreground-primary overflow-hidden max-h-12 [&_p]:m-0 [&_img]:my-1" 
+                    dangerouslySetInnerHTML={{ __html: task.description || '' }}
+                />
+            );
+        }
+
         if (fieldId === 'dueDate') { return task.dueDate ? new Date(task.dueDate.replace(/-/g, '/')).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : <span className="text-gray-400">-</span>; }
         if (fieldId === 'assignees') { return <div className="flex -space-x-2">{task.assignees?.length > 0 ? task.assignees.map(a => <Avatar key={a.id} name={a.name} />) : <Avatar />}</div> }
         
@@ -132,7 +165,6 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, gridTemplateColumns, cells, cus
 
         if (fieldId === 'dueDate') { 
             return (
-                // --- SOLUCIÓN: Corrección del error de TS y posicionamiento con CSS ---
                 <DatePicker 
                     selected={task.dueDate ? new Date(task.dueDate.replace(/-/g, '/')) : null} 
                     onChange={(date) => { 
@@ -141,7 +173,6 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, gridTemplateColumns, cells, cus
                     }} 
                     popperPlacement="bottom-start"
                     inline
-                    popperClassName="datepicker-popper-offset" // Clase CSS para bajar el pop-up
                 />
             );
         }
@@ -192,7 +223,6 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, gridTemplateColumns, cells, cus
                                 }
                                 handleTaskUpdate({ customFields: { [field.id]: cfVal } });
                             }} className="flex items-center justify-between cursor-pointer">
-                                {/* --- SOLUCIÓN: Quitar checklist y puntos para dropdowns --- */}
                                 <div className="px-3 py-2 hover:bg-background-secondary w-full flex items-center justify-between">
                                     <Tag text={opt.value} color={opt.color} />
                                     {field.type === 'labels' && (
@@ -234,7 +264,7 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, gridTemplateColumns, cells, cus
                             <DescriptionEditor 
                                 content={task.description}
                                 onClose={() => setIsDescEditorOpen(false)}
-                                onSave={(newDescription) => {
+                                onSave={(newDescription: string) => {
                                     handleTaskUpdate({ description: newDescription });
                                 }}
                             />
