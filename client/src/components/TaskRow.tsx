@@ -8,7 +8,6 @@ import "react-datepicker/dist/react-datepicker.css";
 import { Cell } from '@tanstack/react-table';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-// --- SOLUCIÓN: Importar la extensión de Imagen ---
 import Image from '@tiptap/extension-image';
 
 const useClickOutside = (ref: React.RefObject<any>, handler: () => void) => {
@@ -36,7 +35,6 @@ const DescriptionEditor: React.FC<DescriptionEditorProps> = ({ content, onSave, 
     const editorRef = useRef<HTMLDivElement>(null);
 
     const editor = useEditor({
-        // --- SOLUCIÓN: Añadir la extensión de Imagen al editor ---
         extensions: [StarterKit, Image],
         content: content || '',
         editorProps: {
@@ -67,7 +65,8 @@ const DescriptionEditor: React.FC<DescriptionEditorProps> = ({ content, onSave, 
     }, [editor]);
 
     return (
-        <div className="absolute z-30 mt-2 p-3 bg-card border border-border rounded shadow-lg w-[450px]" ref={editorRef}>
+        // --- SOLUCIÓN: Se añade 'top-10' para forzar la posición hacia abajo ---
+        <div className="absolute z-30 p-3 bg-card border border-border rounded shadow-lg w-[450px] top-10" ref={editorRef}>
             <h4 className="font-bold mb-2 text-sm">Editar Descripción</h4>
             <EditorContent editor={editor} />
             <div className="flex justify-end mt-2">

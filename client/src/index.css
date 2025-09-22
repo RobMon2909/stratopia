@@ -71,8 +71,7 @@
   color: hsl(var(--text-primary)) !important;
 }
 
-.react-datepicker-popper {
-    margin-top: 15px !important; /* Aumenta este valor si quieres bajarlo aún más */
-    z-index: 50 !important;      /* Un z-index alto para que aparezca por encima de todo */
+body .react-datepicker-popper {
+    margin-top: 25px !important; /* Aumenta este valor si quieres aún más espacio */
+    z-index: 9999 !important;      
 }
-/* La llave extra al final ha sido eliminada */

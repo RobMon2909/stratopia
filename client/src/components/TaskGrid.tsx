@@ -61,19 +61,15 @@ const TaskGrid: React.FC<TaskGridProps> = ({ tasks, customFields, fieldOptions, 
 
     const [columnOrder, setColumnOrder] = useState<string[]>([]);
 
-    // --- SOLUCIÓN: Sincronizar el orden de las columnas con un useEffect ---
     useEffect(() => {
         const savedOrderJSON = localStorage.getItem('taskGridColumnOrder');
         const savedOrder = savedOrderJSON ? JSON.parse(savedOrderJSON) : [];
         const currentColumnIdsSet = new Set(columnIds);
-
         const validSavedOrder = savedOrder.filter((id: string) => currentColumnIdsSet.has(id));
         const savedOrderSet = new Set(validSavedOrder);
         const newColumns = columnIds.filter(id => !savedOrderSet.has(id));
-
         setColumnOrder([...validSavedOrder, ...newColumns]);
     }, [columnIds]);
-    // --- Fin de la solución ---
 
     const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => {
         const savedSizing = localStorage.getItem('taskGridColumnSizing');
@@ -131,13 +127,15 @@ const TaskGrid: React.FC<TaskGridProps> = ({ tasks, customFields, fieldOptions, 
     );
 
     return (
-        <div className="w-full text-sm text-left text-foreground-secondary bg-card rounded-lg shadow-md">
+        // --- SOLUCIÓN: Contenedor principal con overflow-x-auto ---
+        <div className="w-full text-sm text-left text-foreground-secondary bg-card rounded-lg shadow-md overflow-x-auto">
             <div className="text-xs text-foreground-primary uppercase bg-background-secondary sticky top-0 z-10 border-b border-border">
                 {table.getHeaderGroups().map(headerGroup => (
                     <DragDropContext onDragEnd={onColumnDragEnd} key={headerGroup.id}>
                         <Droppable droppableId="droppable-headers" direction="horizontal">
                             {(provided) => (
-                                <div className="flex" ref={provided.innerRef} {...provided.droppableProps}>
+                                // Contenedor de cabecera con min-w-max para que se expanda con el contenido
+                                <div className="flex min-w-max" ref={provided.innerRef} {...provided.droppableProps}>
                                     {headerGroup.headers.map((header, index) => (
                                         <Draggable key={header.id} draggableId={header.id} index={index}>
                                             {(provided) => (
@@ -155,34 +153,37 @@ const TaskGrid: React.FC<TaskGridProps> = ({ tasks, customFields, fieldOptions, 
                 ))}
             </div>
 
-            <DragDropContext onDragEnd={onTaskDragEnd}>
-                <Droppable droppableId="droppable-tasks">
-                    {(provided) => (
-                        <div ref={provided.innerRef} {...provided.droppableProps}>
-                            {table.getRowModel().rows.map((row, index) => (
-                                <Draggable key={row.id} draggableId={row.id} index={index}>
-                                    {(provided) => (
-                                        <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}>
-                                            <TaskRow
-                                                task={row.original}
-                                                gridTemplateColumns={gridTemplateColumns}
-                                                cells={row.getVisibleCells()}
-                                                customFields={customFields}
-                                                fieldOptions={fieldOptions}
-                                                onOpenTask={onOpenTask}
-                                                onTaskUpdate={onTaskUpdate}
-                                                level={0}
-                                                allUsers={allUsers}
-                                            />
-                                        </div>
-                                    )}
-                                </Draggable>
-                            ))}
-                            {provided.placeholder}
-                        </div>
-                    )}
-                </Droppable>
-            </DragDropContext>
+            {/* Contenedor del cuerpo con min-w-max */}
+            <div className="min-w-max">
+                <DragDropContext onDragEnd={onTaskDragEnd}>
+                    <Droppable droppableId="droppable-tasks">
+                        {(provided) => (
+                            <div ref={provided.innerRef} {...provided.droppableProps}>
+                                {table.getRowModel().rows.map((row, index) => (
+                                    <Draggable key={row.id} draggableId={row.id} index={index}>
+                                        {(provided) => (
+                                            <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}>
+                                                <TaskRow
+                                                    task={row.original}
+                                                    gridTemplateColumns={gridTemplateColumns}
+                                                    cells={row.getVisibleCells()}
+                                                    customFields={customFields}
+                                                    fieldOptions={fieldOptions}
+                                                    onOpenTask={onOpenTask}
+                                                    onTaskUpdate={onTaskUpdate}
+                                                    level={0}
+                                                    allUsers={allUsers}
+                                                />
+                                            </div>
+                                        )}
+                                    </Draggable>
+                                ))}
+                                {provided.placeholder}
+                            </div>
+                        )}
+                    </Droppable>
+                </DragDropContext>
+            </div>
         </div>
     );
 };
